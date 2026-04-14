@@ -26,13 +26,14 @@ export class CollisionDetector {
     return false
   }
 
-  getClosestCollisionPoint(
-    position: THREE.Vector3,
-    direction: THREE.Vector3,
-    maxDistance: number = 100
+  // Placeholder for ray-based collision detection
+  // Will be implemented when needed for shooting mechanics
+  raycast(
+    _origin: THREE.Vector3,
+    _direction: THREE.Vector3,
+    _maxDistance: number = 100
   ): THREE.Vector3 | null {
-    const raycaster = new THREE.Raycaster(position, direction.clone().normalize())
-    // For now, return null - proper collision will need mesh intersection
+    // TODO: Implement proper ray-based collision
     return null
   }
 }
