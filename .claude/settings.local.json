@@ -1,11 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(openspec instructions:*)",
-      "Bash(openspec status:*)",
-      "Bash(openspec new:*)",
-      "Bash(npm create:*)",
-      "Bash(npm *:*)"
+      "Bash(openspec:*)",
+      "Bash(npm:*)",
+      "Bash(pnpm:*)",
+      "Bash(git:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(mkdir:*)",
+      "Bash(npx:*)"
     ]
   }
 }

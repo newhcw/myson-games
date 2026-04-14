@@ -1,7 +1,11 @@
 <script setup lang="ts">
-import HelloWorld from './components/HelloWorld.vue'
+// Root component
 </script>
 
 <template>
-  <HelloWorld />
+  <router-view />
 </template>
+
+<style>
+/* Global styles are in style.css */
+</style>
