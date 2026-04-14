@@ -5,15 +5,13 @@ schema: spec-driven
 # Add your tech stack, conventions, style guides, domain knowledge, etc.
 # Example:
 context: |
-  Tech stack:  Vue, Node.js
-  打包工具: Vite
+  Output language: All artifact content must be written in Simplified Chinese,
+  including section titles, descriptions, scenario text, and task items.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
 # Example:
 rules:
-  proposal:
-    - Keep proposals under 500 words
-    - Always include a "Non-goals" section
   tasks:
-    - Break tasks into chunks of max 2 hours
+    - |
+      When a task involves E2E test cases, the TC ID generating should follow the openspec-e2e skill conventions
