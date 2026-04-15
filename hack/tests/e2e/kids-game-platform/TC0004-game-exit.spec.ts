@@ -39,19 +39,19 @@ test.describe('游戏退出测试', () => {
     // 访问设置页面
     await settingsPage.goto();
     await settingsPage.expectLoaded();
-    
+
     // 点击返回按钮
     await settingsPage.clickBackButton();
-    
+
     // 验证返回首页
     await expect(page).toHaveURL('/');
-    
+
     // 验证首页加载
     const homePage = await import('../../../pages/HomePage').then(m => new m.HomePage(page));
     await homePage.expectLoaded();
-    
-    // 验证设置页面元素不再可见
-    await expect(settingsPage.title).not.toBeVisible();
+
+    // 验证设置页面元素不再可见 - 使用设置页面的保存按钮来验证
+    await expect(settingsPage.saveButton).not.toBeVisible();
   });
 
   test('TC0012b - 游戏页面退出按钮存在且可点击', async () => {

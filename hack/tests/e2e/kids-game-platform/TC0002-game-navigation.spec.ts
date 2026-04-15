@@ -21,7 +21,7 @@ test.describe('游戏导航测试', () => {
     await homePage.expectLoaded();
     
     // 点击游戏卡片
-    await homePage.clickGameCard();
+    await homePage.clickFirstGame();
     
     // 验证URL变化
     await expect(page).toHaveURL(/\/game\?game=fps-shooter/);

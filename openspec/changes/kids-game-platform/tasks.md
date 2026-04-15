@@ -98,18 +98,18 @@
 
 > 使用 Playwright + openspec-e2e 技能生成和管理测试用例
 
-- [] TC0001 首页应正确加载并显示标题 (TC0001-home-page.spec.ts)
-- [] TC0002 首页应显示游戏卡片 (TC0001-home-page.spec.ts)
-- [] TC0003 游戏卡片应有悬停效果 (TC0001-home-page.spec.ts)
-- [] TC0004 点击游戏卡片应进入游戏页面 (TC0002-game-navigation.spec.ts)
-- [] TC0005 游戏页面应显示正确的 HUD 元素 (TC0002-game-navigation.spec.ts)
-- [] TC0006 游戏页面应显示初始生命值 (TC0002-game-navigation.spec.ts)
-- [] TC0007 设置页面应正确加载 (TC0003-settings-page.spec.ts)
-- [] TC0008 设置页面应显示所有设置选项 (TC0003-settings-page.spec.ts)
-- [] TC0009 可以调整音量滑块 (TC0003-settings-page.spec.ts)
-- [] TC0010 可以选择难度 (TC0003-settings-page.spec.ts)
-- [] TC0011 保存设置后应返回首页 (TC0003-settings-page.spec.ts)
-- [] TC0012 退出游戏应返回首页 (TC0004-game-exit.spec.ts)
-- [] TC0013 从设置页面返回首页 (TC0004-game-exit.spec.ts)
+- [x] TC0001 首页应正确加载并显示标题 (TC0001-home-page.spec.ts)
+- [x] TC0002 首页应显示游戏卡片 (TC0001-home-page.spec.ts)
+- [x] TC0003 游戏卡片应有悬停效果 (TC0001-home-page.spec.ts)
+- [x] TC0004 点击游戏卡片应进入游戏页面 (TC0002-game-navigation.spec.ts)
+- [x] TC0005 游戏页面应显示正确的 HUD 元素 (TC0002-game-navigation.spec.ts)
+- [x] TC0006 游戏页面应显示初始生命值 (TC0002-game-navigation.spec.ts)
+- [x] TC0007 设置页面应正确加载 (TC0003-settings-page.spec.ts)
+- [x] TC0008 设置页面应显示所有设置选项 (TC0003-settings-page.spec.ts)
+- [x] TC0009 可以调整音量滑块 (TC0003-settings-page.spec.ts)
+- [x] TC0010 可以选择难度 (TC0003-settings-page.spec.ts)
+- [x] TC0011 保存设置后应返回首页 (TC0003-settings-page.spec.ts)
+- [x] TC0012 退出游戏应返回首页 (TC0004-game-exit.spec.ts)
+- [x] TC0013 从设置页面返回首页 (TC0004-game-exit.spec.ts)
 
 > 测试目录: `hack/tests/e2e/kids-game-platform/`
