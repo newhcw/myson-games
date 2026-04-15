@@ -1,13 +1,21 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as THREE from 'three'
 import SceneView from '@/components/game/SceneView.vue'
 import { collisionDetector } from '@/game/utils/Collision'
+import { useWeaponStore } from '@/stores/weapon'
+import { useGameStore } from '@/stores/game'
+import { DEFAULT_WEAPONS } from '@/game/weapons/types'
+import { soundManager } from '@/game/sound/SoundManager'
 
 const router = useRouter()
 const isLoading = ref(true)
 const containerRef = ref<HTMLDivElement | null>(null)
+
+// Stores
+const weaponStore = useWeaponStore()
+const gameStore = useGameStore()
 
 // Three.js objects
 let scene: THREE.Scene | null = null
@@ -20,9 +28,33 @@ const playerPosition = new THREE.Vector3(0, 1.6, 0)
 const moveSpeed = 5
 const keys = { w: false, a: false, s: false, d: false }
 
+// Shooting state
+const lastFireTime = ref(0)
+const isFiring = ref(false)
+
 // Mouse look
 let yaw = 0
 let pitch = 0
+
+// Computed
+const currentWeaponName = computed(() => {
+  const weapon = weaponStore.currentWeapon
+  return weapon?.name || '未知武器'
+})
+
+const ammoDisplay = computed(() => {
+  const ammo = weaponStore.currentAmmo
+  const weapon = weaponStore.currentWeapon
+  if (!weapon) return '0 / 0'
+  return `${ammo.current} / ${ammo.reserve}`
+})
+
+const healthPercent = computed(() => {
+  return gameStore.health
+})
+
+const isReloading = computed(() => weaponStore.isReloading)
+const currentWeaponIndex = computed(() => weaponStore.currentWeaponIndex)
 
 const onSceneReady = (
   sceneObj: THREE.Scene,
@@ -66,11 +98,25 @@ const createObstacles = () => {
 }
 
 const handleKeyDown = (e: KeyboardEvent) => {
+  // Ignore if not in game
+  if (document.pointerLockElement !== containerRef.value) return
+
   switch (e.key.toLowerCase()) {
+    // Movement
     case 'w': keys.w = true; break
     case 'a': keys.a = true; break
     case 's': keys.s = true; break
     case 'd': keys.d = true; break
+    // Weapon switching (1-5)
+    case '1': weaponStore.switchWeapon(0); break
+    case '2': weaponStore.switchWeapon(1); break
+    case '3': weaponStore.switchWeapon(2); break
+    case '4': weaponStore.switchWeapon(3); break
+    case '5': weaponStore.switchWeapon(4); break
+    // Cycle weapon (Q)
+    case 'q': weaponStore.cycleWeapon(); break
+    // Reload (R)
+    case 'r': weaponStore.reload(); break
   }
 }
 
@@ -101,12 +147,87 @@ const handleMouseMove = (e: MouseEvent) => {
 const handleClick = async () => {
   if (!containerRef.value) return
 
+  // First click: lock pointer
   if (document.pointerLockElement !== containerRef.value) {
     try {
       await containerRef.value.requestPointerLock()
+      // Initialize audio context on user interaction
+      soundManager.resume()
     } catch (err) {
       console.error('Failed to lock pointer:', err)
     }
+  }
+}
+
+// Handle mouse down for shooting
+const handleMouseDown = (e: MouseEvent) => {
+  if (document.pointerLockElement !== containerRef.value) return
+
+  if (e.button === 0) {
+    // Left click: fire
+    isFiring.value = true
+    fire()
+  }
+}
+
+const handleMouseUp = (e: MouseEvent) => {
+  if (e.button === 0) {
+    isFiring.value = false
+  }
+}
+
+// Handle right click for scope
+const handleContextMenu = (e: MouseEvent) => {
+  e.preventDefault()
+  if (document.pointerLockElement !== containerRef.value) return
+  weaponStore.toggleScope()
+}
+
+// Fire weapon
+const fire = () => {
+  const weapon = weaponStore.currentWeapon
+  if (!weapon) return
+
+  const now = Date.now()
+  // Check fire rate
+  const fireInterval = 1000 / weapon.fireRate
+  if (now - lastFireTime.value < fireInterval) return
+  lastFireTime.value = now
+
+  const ammo = weaponStore.currentAmmo
+
+  // Check if has ammo
+  if (ammo.current <= 0 || weaponStore.isReloading) {
+    // Play empty click sound
+    soundManager.playEmpty()
+    return
+  }
+
+  // Attempt to fire (checks ammo and reload state)
+  const fired = weaponStore.fire()
+  if (fired) {
+    // Play fire sound
+    soundManager.playShoot()
+  } else {
+    // Play empty click if no ammo
+    soundManager.playEmpty()
+  }
+}
+
+// Auto fire while holding
+const updateAutoFire = (delta: number) => {
+  if (!isFiring.value) return
+
+  const weapon = weaponStore.currentWeapon
+  if (!weapon || !weapon.isAuto) return
+
+  // Keep TypeScript happy
+  void delta
+
+  const now = Date.now()
+  const fireInterval = 1000 / weapon.fireRate
+  if (now - lastFireTime.value >= fireInterval) {
+    fire()
   }
 }
 
@@ -148,6 +269,14 @@ const gameLoop = () => {
   lastTime = now
 
   updateMovement(delta)
+  updateAutoFire(delta)
+
+  // Update scope FOV
+  if (camera && weaponStore.currentScope.isActive) {
+    const targetFov = weaponStore.currentScope.originalFov / weaponStore.currentScope.magnification
+    camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 0.1)
+    camera.updateProjectionMatrix()
+  }
 
   if (renderer && scene && camera) {
     renderer.render(scene, camera)
@@ -163,10 +292,34 @@ const exitGame = () => {
   router.push({ name: 'Home' })
 }
 
+// Track previous states for sound effects
+let previousReloadState = false
+let previousScopeActive = false
+
+// Watch reload state to play sound
+watch(isReloading, (newVal) => {
+  if (newVal === true && previousReloadState === false) {
+    // Started reloading
+    soundManager.playReload()
+  }
+  previousReloadState = newVal
+})
+
+// Watch scope state to play sound
+watch(() => weaponStore.currentScope.isActive, (newVal) => {
+  if (newVal !== previousScopeActive) {
+    soundManager.playScope()
+    previousScopeActive = newVal
+  }
+})
+
 onMounted(() => {
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('keyup', handleKeyUp)
   document.addEventListener('mousemove', handleMouseMove)
+  document.addEventListener('mousedown', handleMouseDown)
+  document.addEventListener('mouseup', handleMouseUp)
+  containerRef.value?.addEventListener('contextmenu', handleContextMenu)
 
   // Start game loop after a brief delay to ensure scene is loaded
   setTimeout(() => {
@@ -178,6 +331,9 @@ onUnmounted(() => {
   window.removeEventListener('keydown', handleKeyDown)
   window.removeEventListener('keyup', handleKeyUp)
   document.removeEventListener('mousemove', handleMouseMove)
+  document.removeEventListener('mousedown', handleMouseDown)
+  document.removeEventListener('mouseup', handleMouseUp)
+  containerRef.value?.removeEventListener('contextmenu', handleContextMenu)
 
   if (animationId) {
     cancelAnimationFrame(animationId)
@@ -213,25 +369,48 @@ onUnmounted(() => {
         <div class="health-bar">
           <span class="label">生命值</span>
           <div class="bar">
-            <div class="fill" style="width: 100%"></div>
+            <div class="fill" :style="{ width: healthPercent + '%' }"></div>
           </div>
         </div>
         <div class="score">
-          <span>得分: 0</span>
+          <span>得分: {{ gameStore.score }}</span>
+          <span class="kills">击杀: {{ gameStore.kills }}</span>
         </div>
       </div>
 
-      <div class="crosshair">+</div>
+      <!-- Crosshair -->
+      <div class="crosshair" :class="{ 'scope-active': weaponStore.currentScope.isActive }">
+        <span v-if="!weaponStore.currentScope.isActive" class="crosshair-dot"></span>
+        <span v-if="weaponStore.currentScope.isActive" class="scope-cross">
+          <span class="scope-line horizontal"></span>
+          <span class="scope-line vertical"></span>
+        </span>
+      </div>
 
       <div class="hud-bottom">
+        <!-- Weapon indicator -->
+        <div class="weapon-indicator">
+          <div
+            v-for="(weapon, index) in DEFAULT_WEAPONS"
+            :key="weapon.id"
+            class="weapon-slot"
+            :class="{ active: currentWeaponIndex === index }"
+          >
+            {{ index + 1 }}
+          </div>
+        </div>
+
         <div class="weapon-info">
-          <span class="weapon-name">手枪</span>
-          <span class="ammo">12 / ∞</span>
+          <span class="weapon-name">{{ currentWeaponName }}</span>
+          <span class="ammo" :class="{ 'low-ammo': weaponStore.currentAmmo.current <= 5, 'reloading': isReloading }">
+            <template v-if="isReloading">换弹中...</template>
+            <template v-else>{{ ammoDisplay }}</template>
+          </span>
         </div>
       </div>
 
       <div class="controls-hint">
-        <p>WASD 移动 | 鼠标控制视角 | 点击画面锁定鼠标</p>
+        <p>WASD 移动 | 鼠标控制视角 | 1-5/Q 切换武器 | R 换弹 | 右键倍镜</p>
       </div>
     </div>
 
@@ -311,10 +490,18 @@ onUnmounted(() => {
 }
 
 .score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   color: #fff;
   font-size: 24px;
   font-weight: 700;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.kills {
+  font-size: 16px;
+  color: #FF6B6B;
 }
 
 .crosshair {
@@ -322,15 +509,77 @@ onUnmounted(() => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  color: rgba(255, 255, 255, 0.8);
-  font-size: 24px;
-  font-weight: 300;
+}
+
+.crosshair-dot {
+  display: block;
+  width: 8px;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+}
+
+.crosshair.scope-active .scope-cross {
+  position: relative;
+  display: block;
+  width: 60px;
+  height: 60px;
+}
+
+.scope-line {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.scope-line.horizontal {
+  width: 100%;
+  height: 1px;
+  top: 50%;
+  left: 0;
+}
+
+.scope-line.vertical {
+  width: 1px;
+  height: 100%;
+  left: 50%;
+  top: 0;
 }
 
 .hud-bottom {
   position: absolute;
   bottom: 20px;
   right: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.weapon-indicator {
+  display: flex;
+  gap: 8px;
+}
+
+.weapon-slot {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+}
+
+.weapon-slot.active {
+  background: rgba(255, 193, 7, 0.9);
+  border-color: #FFC107;
+  color: #000;
+  transform: scale(1.1);
 }
 
 .weapon-info {
@@ -348,6 +597,20 @@ onUnmounted(() => {
 .ammo {
   font-size: 32px;
   font-weight: 700;
+}
+
+.ammo.low-ammo {
+  color: #FF3B30;
+  animation: pulse 0.5s infinite;
+}
+
+.ammo.reloading {
+  color: #FFC107;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 .controls-hint {

@@ -9,6 +9,7 @@ export interface WeaponData {
   scope: boolean
   scopeMultiplier: number
   description: string
+  isAuto: boolean
 }
 
 export interface AmmoData {
@@ -29,6 +30,7 @@ export const DEFAULT_WEAPONS: WeaponData[] = [
     scope: false,
     scopeMultiplier: 1,
     description: '精准度高，备用武器',
+    isAuto: false,
   },
   {
     id: 'smg',
@@ -41,6 +43,7 @@ export const DEFAULT_WEAPONS: WeaponData[] = [
     scope: false,
     scopeMultiplier: 1,
     description: '射速快，近战利器',
+    isAuto: true,
   },
   {
     id: 'rifle',
@@ -53,6 +56,7 @@ export const DEFAULT_WEAPONS: WeaponData[] = [
     scope: false,
     scopeMultiplier: 1,
     description: '全能型，适合中距离',
+    isAuto: true,
   },
   {
     id: 'sniper',
@@ -65,6 +69,7 @@ export const DEFAULT_WEAPONS: WeaponData[] = [
     scope: true,
     scopeMultiplier: 4,
     description: '高伤害，超远距离',
+    isAuto: false,
   },
   {
     id: 'shotgun',
@@ -77,6 +82,7 @@ export const DEFAULT_WEAPONS: WeaponData[] = [
     scope: false,
     scopeMultiplier: 1,
     description: '范围伤害，近战之王',
+    isAuto: false,
   },
 ]
 

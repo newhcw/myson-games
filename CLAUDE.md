@@ -69,10 +69,10 @@ apps/                → 项目目录
     ├── package.json
     └── vite.config.js
 hack/                → 项目脚本及测试用例文件
-  tests/             → E2E 测试（Playwright）
-    e2e/             → 测试用例文件
-    fixtures/        → 测试 fixtures（auth, config）
-    pages/           → 页面对象模型
+  ├── tests/             → E2E 测试（Playwright）
+  ├── e2e/             → 测试用例文件
+  ├── fixtures/        → 测试 fixtures（auth, config）
+  ├── pages/           → 页面对象模型
 openspec/            → OpenSpec相关文档
   changes/           → OpenSpec变更记录
 ```
@@ -94,7 +94,7 @@ openspec/            → OpenSpec相关文档
 
 ```bash
 # 在 frontend 目录下
-cd frontend
+cd apps/frontend
 npm run dev      # 启动开发服务器
 npm run build    # 构建生产版本
 npm run preview  # 预览生产构建
@@ -110,7 +110,7 @@ pnpm test:ui           # 交互式测试界面
 pnpm test:debug        # 调试模式
 pnpm report            # 查看 HTML 报告
 ```
-测试文件命名规范：`TC{NNNN}*.ts`（如 `TC0001-login.ts`），放在 `hack/tests/e2e/` 对应模块目录下。
+测试文件命名规范：`TC{NNNN}*.spec.ts`（如 `TC0001-login.spec.ts`），放在 `hack/tests/e2e/` 对应模块目录下。
 
 
 

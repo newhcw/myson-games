@@ -1,11 +1,7 @@
 {
-  "name": "hack",
+  "name": "kids-game-e2e",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "test": "tests"
-  },
+  "type": "module",
   "scripts": {
     "test": "playwright test",
     "test:headed": "playwright test --headed",
@@ -13,10 +9,7 @@
     "test:debug": "playwright test --debug",
     "report": "playwright show-report"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.59.1"
+    "@playwright/test": "^1.52.0"
   }
 }
