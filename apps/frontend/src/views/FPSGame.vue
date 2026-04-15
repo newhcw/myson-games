@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import * as THREE from 'three'
 import SceneView from '@/components/game/SceneView.vue'
+import { collisionDetector } from '@/game/utils/Collision'
 
 const router = useRouter()
 const isLoading = ref(true)
@@ -59,6 +60,8 @@ const createObstacles = () => {
     box.castShadow = true
     box.receiveShadow = true
     scene!.add(box)
+    // 添加碰撞体
+    collisionDetector.addCollider(box)
   })
 }
 
@@ -123,8 +126,15 @@ const updateMovement = (delta: number) => {
     direction.y = 0
     direction.normalize()
 
-    playerPosition.x += direction.x * moveSpeed * delta
-    playerPosition.z += direction.z * moveSpeed * delta
+    // 在移动前保存当前位置
+    const newPosition = playerPosition.clone()
+    newPosition.x += direction.x * moveSpeed * delta
+    newPosition.z += direction.z * moveSpeed * delta
+
+    // 检查移动后的新位置是否与障碍物发生碰撞
+    if (!collisionDetector.checkCollision(newPosition)) {
+      playerPosition.copy(newPosition)
+    }
   }
 
   camera.position.copy(playerPosition)
