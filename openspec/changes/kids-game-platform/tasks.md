@@ -111,5 +111,15 @@
 - [x] TC0011 保存设置后应返回首页 (TC0003-settings-page.spec.ts)
 - [x] TC0012 退出游戏应返回首页 (TC0004-game-exit.spec.ts)
 - [x] TC0013 从设置页面返回首页 (TC0004-game-exit.spec.ts)
+- [x] TC0014 游戏加载后应显示游戏场景 (TC0005-game-loading.spec.ts)
+- [x] TC0015 游戏加载完成后应显示 HUD (TC0005-game-loading.spec.ts)
+- [x] TC0016 3D 场景元素应正确渲染 (TC0005-game-loading.spec.ts)
+- [x] TC0017 武器信息应显示在 HUD 上 (TC0006-weapon-system.spec.ts)
+- [x] TC0018 武器切换槽位应显示 (TC0006-weapon-system.spec.ts)
+- [x] TC0019 准星应显示在屏幕中央 (TC0006-weapon-system.spec.ts)
+- [x] TC0020 控制提示应显示武器操作说明 (TC0006-weapon-system.spec.ts)
+- [x] TC0021 音量设置应能保存 (TC0007-storage.spec.ts)
+- [x] TC0022 难度设置应能保存 (TC0007-storage.spec.ts)
+- [x] TC0023 页面刷新后设置应保持 (TC0007-storage.spec.ts)
 
 > 测试目录: `hack/tests/e2e/kids-game-platform/`

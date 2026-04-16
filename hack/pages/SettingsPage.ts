@@ -20,6 +20,9 @@ export class SettingsPage {
   readonly pageTitle: Locator
   readonly header: Locator
 
+  // 音量值显示
+  readonly volumeValue: Locator
+
   constructor(page: Page) {
     this.page = page
 
@@ -39,6 +42,9 @@ export class SettingsPage {
     this.title = page.locator('h1')
     this.pageTitle = page.locator('h1')
     this.header = page.locator('header')
+
+    // 音量值显示
+    this.volumeValue = page.locator('.volume-value, .value')
   }
 
   /**

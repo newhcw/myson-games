@@ -18,8 +18,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'cd e:/myson-games/apps/frontend && npm run dev',
+    command: 'cd ../apps/frontend && npm run dev -- --port 5173',
     url: 'http://localhost:5173',
-    reuseExistingServer: !process.env.CI,
-  },
+    reuseExistingServer: !process.env.CI
+  }
 });
