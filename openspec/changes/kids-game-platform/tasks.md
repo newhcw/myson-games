@@ -52,12 +52,12 @@
 - [ ] 6.3 实现敌人巡逻系统（Waypoint 路径点、来回走动、停留等待）
 - [ ] 6.4 实现敌人视野检测（扇形区域、距离判断）
 - [ ] 6.5 实现敌人状态机（巡逻 → 追逐 → 丢失 → 巡逻）
-- [ ] 6.6 实现敌人头顶血条 UI（3D 位置投影到 2D 屏幕）
-- [ ] 6.7 实现击中扣血逻辑和伤害数字飘字
-- [ ] 6.8 实现敌人被击中视觉反馈（红色闪烁、后仰位移）
-- [ ] 6.9 实现敌人死亡动画（卡通消散效果）和击杀计数
-- [ ] 6.10 实现敌人重生系统（30 秒后原位置重生）
-- [ ] 6.11 完善 HUD 血量/弹药/击杀数显示组件
+- [x] 6.6 实现敌人头顶血条 UI（3D 位置投影到 2D 屏幕）
+- [x] 6.7 实现击中扣血逻辑和伤害数字飘字
+- [x] 6.8 实现敌人被击中视觉反馈（红色闪烁、后仰位移）
+- [x] 6.9 实现敌人死亡动画（卡通消散效果）和击杀计数
+- [x] 6.10 实现敌人重生系统（30 秒后原位置重生）
+- [x] 6.11 完善 HUD 血量/弹药/击杀数显示组件
 
 ## 7. 玩家自定义系统
 
@@ -98,28 +98,28 @@
 
 > 使用 Playwright + openspec-e2e 技能生成和管理测试用例
 
-- [x] TC0001 首页应正确加载并显示标题 (TC0001-home-page.spec.ts)
-- [x] TC0002 首页应显示游戏卡片 (TC0001-home-page.spec.ts)
-- [x] TC0003 游戏卡片应有悬停效果 (TC0001-home-page.spec.ts)
-- [x] TC0004 点击游戏卡片应进入游戏页面 (TC0002-game-navigation.spec.ts)
-- [x] TC0005 游戏页面应显示正确的 HUD 元素 (TC0002-game-navigation.spec.ts)
-- [x] TC0006 游戏页面应显示初始生命值 (TC0002-game-navigation.spec.ts)
-- [x] TC0007 设置页面应正确加载 (TC0003-settings-page.spec.ts)
-- [x] TC0008 设置页面应显示所有设置选项 (TC0003-settings-page.spec.ts)
-- [x] TC0009 可以调整音量滑块 (TC0003-settings-page.spec.ts)
-- [x] TC0010 可以选择难度 (TC0003-settings-page.spec.ts)
-- [x] TC0011 保存设置后应返回首页 (TC0003-settings-page.spec.ts)
-- [x] TC0012 退出游戏应返回首页 (TC0004-game-exit.spec.ts)
-- [x] TC0013 从设置页面返回首页 (TC0004-game-exit.spec.ts)
-- [x] TC0014 游戏加载后应显示游戏场景 (TC0005-game-loading.spec.ts)
-- [x] TC0015 游戏加载完成后应显示 HUD (TC0005-game-loading.spec.ts)
-- [x] TC0016 3D 场景元素应正确渲染 (TC0005-game-loading.spec.ts)
-- [x] TC0017 武器信息应显示在 HUD 上 (TC0006-weapon-system.spec.ts)
-- [x] TC0018 武器切换槽位应显示 (TC0006-weapon-system.spec.ts)
-- [x] TC0019 准星应显示在屏幕中央 (TC0006-weapon-system.spec.ts)
-- [x] TC0020 控制提示应显示武器操作说明 (TC0006-weapon-system.spec.ts)
-- [x] TC0021 音量设置应能保存 (TC0007-storage.spec.ts)
-- [x] TC0022 难度设置应能保存 (TC0007-storage.spec.ts)
-- [x] TC0023 页面刷新后设置应保持 (TC0007-storage.spec.ts)
+- [] TC0001 首页应正确加载并显示标题 (TC0001-home-page.spec.ts)
+- [] TC0002 首页应显示游戏卡片 (TC0001-home-page.spec.ts)
+- [] TC0003 游戏卡片应有悬停效果 (TC0001-home-page.spec.ts)
+- [] TC0004 点击游戏卡片应进入游戏页面 (TC0002-game-navigation.spec.ts)
+- [] TC0005 游戏页面应显示正确的 HUD 元素 (TC0002-game-navigation.spec.ts)
+- [] TC0006 游戏页面应显示初始生命值 (TC0002-game-navigation.spec.ts)
+- [] TC0007 设置页面应正确加载 (TC0003-settings-page.spec.ts)
+- [] TC0008 设置页面应显示所有设置选项 (TC0003-settings-page.spec.ts)
+- [] TC0009 可以调整音量滑块 (TC0003-settings-page.spec.ts)
+- [] TC0010 可以选择难度 (TC0003-settings-page.spec.ts)
+- [] TC0011 保存设置后应返回首页 (TC0003-settings-page.spec.ts)
+- [] TC0012 退出游戏应返回首页 (TC0004-game-exit.spec.ts)
+- [] TC0013 从设置页面返回首页 (TC0004-game-exit.spec.ts)
+- [] TC0014 游戏加载后应显示游戏场景 (TC0005-game-loading.spec.ts)
+- [] TC0015 游戏加载完成后应显示 HUD (TC0005-game-loading.spec.ts)
+- [] TC0016 3D 场景元素应正确渲染 (TC0005-game-loading.spec.ts)
+- [] TC0017 武器信息应显示在 HUD 上 (TC0006-weapon-system.spec.ts)
+- [] TC0018 武器切换槽位应显示 (TC0006-weapon-system.spec.ts)
+- [] TC0019 准星应显示在屏幕中央 (TC0006-weapon-system.spec.ts)
+- [] TC0020 控制提示应显示武器操作说明 (TC0006-weapon-system.spec.ts)
+- [] TC0021 音量设置应能保存 (TC0007-storage.spec.ts)
+- [] TC0022 难度设置应能保存 (TC0007-storage.spec.ts)
+- [] TC0023 页面刷新后设置应保持 (TC0007-storage.spec.ts)
 
 > 测试目录: `hack/tests/e2e/kids-game-platform/`

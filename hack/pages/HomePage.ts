@@ -1,66 +1,40 @@
-import { type Page, type Locator, expect } from '@playwright/test'
+import { type Page, type Locator, expect } from '@playwright/test';
 
 export class HomePage {
-  readonly page: Page
-
-  // 主页面元素
-  readonly logoText: Locator
-  readonly heroTitle: Locator
-  readonly heroSubtitle: Locator
-  readonly gameCards: Locator
-  readonly gameCard: Locator
-
-  // 导航元素
-  readonly settingsLink: Locator
+  readonly page: Page;
+  readonly gameTitle: Locator;
+  readonly startButton: Locator;
+  readonly settingsButton: Locator;
+  readonly exitButton: Locator;
+  readonly menuButtons: Locator;
 
   constructor(page: Page) {
-    this.page = page
-
-    // 主页面元素定位器
-    this.logoText = page.locator('h1').first()
-    this.heroTitle = page.locator('h2').first()
-    this.heroSubtitle = page.locator('p').first()
-    this.gameCards = page.locator('.game-card')
-    this.gameCard = page.locator('.game-card').first()
-
-    // 导航
-    this.settingsLink = page.locator('a[href*="settings"], a[href*="Settings"]')
+    this.page = page;
+    this.gameTitle = page.locator('.game-title');
+    this.startButton = page.locator('.start-button');
+    this.settingsButton = page.locator('.settings-button');
+    this.exitButton = page.locator('.exit-button');
+    this.menuButtons = page.locator('.menu-button');
   }
 
-  /**
-   * 导航到首页
-   */
-  async goto(): Promise<void> {
-    await this.page.goto('http://localhost:5173')
+  async goto() {
+    await this.page.goto('/');
   }
 
-  /**
-   * 等待页面加载完成
-   */
-  async expectLoaded(): Promise<void> {
-    await expect(this.page).toHaveTitle(/游戏|儿童/i)
-    await expect(this.logoText).toBeVisible()
+  async clickStartButton() {
+    await this.startButton.click();
   }
 
-  /**
-   * 点击设置链接
-   */
-  async clickSettings(): Promise<void> {
-    await this.settingsLink.click()
+  async clickSettingsButton() {
+    await this.settingsButton.click();
   }
 
-  /**
-   * 点击第一个游戏卡片
-   */
-  async clickFirstGame(): Promise<void> {
-    const playBtn = this.gameCard.locator('.play-btn, button')
-    await playBtn.click()
+  async clickExitButton() {
+    await this.exitButton.click();
   }
 
-  /**
-   * 悬停在游戏卡片上
-   */
-  async hoverFirstGame(): Promise<void> {
-    await this.gameCard.hover()
+  async expectLoaded() {
+    await expect(this.gameTitle).toBeVisible();
+    await expect(this.menuButtons).toHaveCount(3);
   }
 }

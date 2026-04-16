@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import * as THREE from 'three'
 import SceneView from '@/components/game/SceneView.vue'
+import EnemyManager from '@/components/game/EnemyManager.vue'
 import { collisionDetector } from '@/game/utils/Collision'
 import { useWeaponStore } from '@/stores/weapon'
 import { useGameStore } from '@/stores/game'
@@ -50,7 +51,7 @@ const ammoDisplay = computed(() => {
 })
 
 const healthPercent = computed(() => {
-  return gameStore.health
+  return (gameStore.health / 100) * 100 // 最大血量是100
 })
 
 const isReloading = computed(() => weaponStore.isReloading)
@@ -69,6 +70,23 @@ const onSceneReady = (
   createObstacles()
 
   isLoading.value = false
+}
+
+// 敌人管理器引用
+let enemyManagerRef: any = null
+
+// 处理玩家被击中
+const onPlayerHit = (damage: number) => {
+  gameStore.health = Math.max(0, gameStore.health - damage)
+  soundManager.playHit()
+}
+
+// 处理敌人被击杀
+const onEnemyKilled = (_enemyId: string, score: number) => {
+  gameStore.addKill()
+  gameStore.addScore(score)
+  // 暂时使用击中音效代替击杀音效
+  soundManager.playHit()
 }
 
 const createObstacles = () => {
@@ -206,12 +224,97 @@ const fire = () => {
   // Attempt to fire (checks ammo and reload state)
   const fired = weaponStore.fire()
   if (fired) {
+    // Perform raycast to check for enemy hits
+    performRaycast()
     // Play fire sound
     soundManager.playShoot()
   } else {
     // Play empty click if no ammo
     soundManager.playEmpty()
   }
+}
+
+// 射击检测
+const performRaycast = () => {
+  if (!camera || !scene) return
+
+  const raycaster = new THREE.Raycaster()
+  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera)
+
+  // 检测场景中的敌人
+  const enemyGroup = scene.getObjectByName('enemies')
+  if (enemyGroup && enemyManagerRef) {
+    const intersects = raycaster.intersectObjects(enemyGroup.children, true)
+
+    // 找到第一个命中的敌人
+    for (const intersect of intersects) {
+      // 找到敌人的根对象
+      let object: THREE.Object3D | null = intersect.object
+      while (object && object.parent !== enemyGroup) {
+        object = object.parent
+      }
+
+      if (object && object.userData) {
+        // 检查是否是敌人
+        const enemy = enemyManagerRef.getActiveEnemies().find((e: any) => e.mesh === object)
+        if (enemy && !enemy.isDead) {
+          const damage = weaponStore.currentWeapon?.damage || 10
+          enemyManagerRef.onEnemyHit(enemy.id, damage)
+
+          // 播放击中特效
+          createHitEffect(intersect.point)
+          break
+        }
+      }
+    }
+  }
+}
+
+// 创建击中特效
+const createHitEffect = (position: THREE.Vector3) => {
+  if (!scene) return
+
+  // 创建粒子效果
+  const particles = new THREE.Group()
+  const particleGeometry = new THREE.SphereGeometry(0.05, 8, 8)
+  const particleMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+
+  for (let i = 0; i < 10; i++) {
+    const particle = new THREE.Mesh(particleGeometry, particleMaterial.clone())
+    particle.position.copy(position)
+
+    const velocity = new THREE.Vector3(
+      (Math.random() - 0.5) * 2,
+      (Math.random() - 0.5) * 2,
+      (Math.random() - 0.5) * 2
+    )
+
+    particles.add(particle)
+
+    // 动画
+    const animate = () => {
+      particle.position.add(velocity.clone().multiplyScalar(0.05))
+      velocity.multiplyScalar(0.95) // 减速
+
+      if (velocity.length() > 0.01) {
+        requestAnimationFrame(animate)
+      } else {
+        particles.remove(particle)
+        particle.geometry.dispose()
+        ;(particle.material as THREE.Material).dispose()
+      }
+    }
+
+    animate()
+  }
+
+  scene.add(particles)
+
+  // 1秒后自动清理
+  setTimeout(() => {
+    scene?.remove(particles)
+    particles.clear()
+  }, 1000)
 }
 
 // Auto fire while holding
@@ -270,6 +373,11 @@ const gameLoop = () => {
 
   updateMovement(delta)
   updateAutoFire(delta)
+
+  // 更新敌人管理器
+  if (enemyManagerRef) {
+    enemyManagerRef.update(delta)
+  }
 
   // Update scope FOV
   if (camera && weaponStore.currentScope.isActive) {
@@ -361,6 +469,18 @@ onUnmounted(() => {
     <SceneView
       v-show="!isLoading"
       @scene-ready="onSceneReady"
+    />
+
+    <!-- 敌人管理器 -->
+    <EnemyManager
+      v-if="!isLoading && scene && camera"
+      :scene="scene"
+      :camera="camera"
+      :player-position="playerPosition"
+      :player-health="gameStore.health"
+      ref="enemyManagerRef"
+      @player-hit="onPlayerHit"
+      @enemy-killed="onEnemyKilled"
     />
 
     <!-- HUD -->

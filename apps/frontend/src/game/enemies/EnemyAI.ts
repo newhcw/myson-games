@@ -1,7 +1,8 @@
 import * as THREE from 'three'
-import type { Enemy, EnemyState } from './types'
+import type { Enemy } from './types'
 import { ENEMY_CONFIGS } from './types'
 import { createEnemyMesh, playIdleAnimation, playWalkAnimation, playChaseAnimation, playHitAnimation, playDeathAnimation, updateEnemyPosition } from './EnemyRenderer'
+import { EnemyHealthBar } from './EnemyHealthBar'
 
 export interface EnemyAIOptions {
   playerPosition: THREE.Vector3
@@ -16,6 +17,8 @@ export class EnemyAI {
   private lastPlayerPosition: THREE.Vector3 = new THREE.Vector3()
   private options: EnemyAIOptions | null = null
   private searchTimeout: Map<string, number> = new Map() // 敌人ID -> 开始搜索的时间
+  private healthBar: EnemyHealthBar | null = null
+  private _camera: THREE.Camera | null = null
 
   // 生成敌人
   spawnEnemy(type: keyof typeof ENEMY_CONFIGS, position: THREE.Vector3): Enemy {
@@ -40,9 +43,12 @@ export class EnemyAI {
     // 创建3D模型
     if (this.scene) {
       // 创建Q版卡通模型
-      enemy.mesh = createEnemyMesh(config)
-      enemy.mesh.position.copy(enemy.position)
-      this.scene.add(enemy.mesh)
+      const enemyMesh = createEnemyMesh(config)
+      enemy.mesh = enemyMesh
+      if (enemy.mesh) {
+        enemy.mesh.position.copy(enemy.position)
+        this.scene.add(enemy.mesh)
+      }
     }
 
     this.enemies.set(enemy.id, enemy)
@@ -50,14 +56,22 @@ export class EnemyAI {
   }
 
   // 设置场景引用
-  setScene(scene: THREE.Group) {
+  setScene(scene: THREE.Group, camera: THREE.Camera) {
     this.scene = scene
+    this._camera = camera
+    // 初始化血条系统
+    if (!this.healthBar) {
+      this.healthBar = new EnemyHealthBar(this._camera)
+    }
     // 为已存在的敌人创建mesh
     this.enemies.forEach(enemy => {
       if (!enemy.mesh) {
-        enemy.mesh = createEnemyMesh(enemy.config)
-        enemy.mesh.position.copy(enemy.position)
-        this.scene!.add(enemy.mesh)
+        const enemyMesh = createEnemyMesh(enemy.config)
+        enemy.mesh = enemyMesh
+        if (enemy.mesh) {
+          enemy.mesh.position.copy(enemy.position)
+          this.scene!.add(enemy.mesh)
+        }
       }
     })
   }
@@ -112,7 +126,7 @@ export class EnemyAI {
   update(delta: number, playerPosition: THREE.Vector3, time: number) {
     if (!this.options) return
 
-    const { onEnemyDead, onPlayerHit } = this.options
+    const { onPlayerHit } = this.options
     this.lastPlayerPosition.copy(playerPosition)
 
     this.enemies.forEach(enemy => {
@@ -148,6 +162,11 @@ export class EnemyAI {
             enemy.mesh.rotation.y = angle
           }
         }
+      }
+
+      // 更新血条
+      if (this.healthBar) {
+        this.healthBar.update(enemy)
       }
     })
   }
@@ -278,6 +297,12 @@ export class EnemyAI {
       playHitAnimation(enemy)
     }
 
+    // 显示伤害数字
+    if (this.healthBar) {
+      const isCritical = damage >= enemy.config.damage * 2
+      this.healthBar.showDamage(enemy, damage, isCritical)
+    }
+
     let killed = false
     if (enemy.health <= 0) {
       enemy.health = 0
@@ -296,7 +321,9 @@ export class EnemyAI {
       }
 
       // 通知击杀
-      this.options?.onEnemyDead(enemy)
+      if (this.options && this.options.onEnemyDead) {
+        this.options.onEnemyDead(enemy)
+      }
     }
 
     return { killed, damageDealt: damage }
@@ -321,6 +348,7 @@ export class EnemyAI {
     })
     this.enemies.clear()
     this.searchTimeout.clear()
+    this.healthBar?.clear()
   }
 }
 

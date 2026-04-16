@@ -60,7 +60,7 @@ export type EnemyState = 'patrol' | 'wait' | 'chase' | 'search' | 'attack' | 'de
 export interface Enemy {
   id: string
   config: EnemyConfig
-  mesh: THREE.Mesh | null
+  mesh: THREE.Group | null
   position: THREE.Vector3
   health: number
   maxHealth: number

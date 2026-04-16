@@ -237,7 +237,9 @@ export function playDeathAnimation(enemy: Enemy, onComplete?: () => void): void 
     })
 
     // 向上飘动
-    enemy.mesh.position.y += 0.05
+    if (enemy.mesh) {
+      enemy.mesh.position.y += 0.05
+    }
 
     if (opacity > 0) {
       requestAnimationFrame(fadeOut)
