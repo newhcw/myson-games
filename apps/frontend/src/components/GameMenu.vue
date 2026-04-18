@@ -44,6 +44,7 @@
 const startGame = () => {
   console.log('开始游戏')
   // 实现游戏开始逻辑
+  
 }
 
 const showSettings = () => {

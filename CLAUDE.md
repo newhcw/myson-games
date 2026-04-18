@@ -1,15 +1,11 @@
-# CLAUDE.md
-
-本文件为 Claude Code (claude.ai/code) 在本项目中工作时提供指导。
-
-## 项目概述
+# 项目概述
 
 儿童游戏平台，从零构建。纯 H5 实现 3D FPS 射击游戏，Vue 3 + Vite 前端，所有数据本地存储。核心约束：目标用户是儿童，视觉风格必须 Q 版卡通化，无后端服务器依赖。
 
-## 架构说明
+# 架构说明
 
 
-### 项目结构
+## 项目结构
 
 - **根目录**：OpenSpec 配置和工作流管理
 - **openspec/changes/kids-game-platform/**：当前活跃变更，包含所有规格文档
@@ -18,7 +14,7 @@
   - `specs/`：各能力的详细规格说明
   - `tasks.md`：实现任务列表
 
-### 技术栈
+## 技术栈
 
 - **前端框架**：Vue 3 + Vite
 - **3D 渲染**：Three.js + TresJS (@tresjs/core)
@@ -28,7 +24,7 @@
 - **3D 模型**：glTF/GLB 格式
 
 
-## 目录结构
+# 目录结构
 
 ```text
 apps/                → 项目目录
@@ -78,9 +74,9 @@ openspec/            → OpenSpec相关文档
 ```
 
 
-## 常用命令
+# 常用命令
 
-### OpenSpec 命令
+## OpenSpec 命令
 
 - `/opsx new` - 创建新变更
 - `/opsx propose` - 生成完整变更提案
@@ -90,7 +86,7 @@ openspec/            → OpenSpec相关文档
 - `/opsx explore` - 探索模式，理清需求
 - `/opsx ff` - 快速生成所有产物
 
-### 开发命令
+## 开发命令
 
 ```bash
 # 在 frontend 目录下
@@ -100,7 +96,7 @@ npm run build    # 构建生产版本
 npm run preview  # 预览生产构建
 ```
 
-### E2E 测试
+## E2E 测试
 
 ```bash
 cd hack
@@ -111,7 +107,6 @@ pnpm test:debug        # 调试模式
 pnpm report            # 查看 HTML 报告
 ```
 测试文件命名规范：`TC{NNNN}*.spec.ts`（如 `TC0001-login.spec.ts`），放在 `hack/tests/e2e/` 对应模块目录下。
-
 
 
 # 开发流程规范
@@ -130,19 +125,11 @@ pnpm report            # 查看 HTML 报告
 - 审查技能`/openspec-review`自动在以下节点触发：`/opsx:apply`任务完成后、`/opsx:feedback`任务完成后、`/opsx:archive`归档前。
 
 
-
 # 代码开发规范
 
 ## 后端代码规范
 
 ## 前端代码规范
-
-- 路径别名 `#/*` 指向 `./src/*`
-- 路由模块放 `src/router/routes/modules/`
-- 视图文件放 `src/views/` 对应目录
-- API 文件放 `src/api/` 对应目录
-- 适配器层 `src/adapter/`：`component`（组件映射）、`form`（表单配置）、`vxe-table`（表格配置）
-- 全局组件在 `src/components/global/` 注册（如`GhostButton`用于表格操作列）
 
 ## E2E测试规范
 
@@ -152,9 +139,3 @@ pnpm report            # 查看 HTML 报告
 - 修改完成后必须运行相关`E2E`测试并确认通过，再标记任务完成
 - 纯内部重构（无`UI`变化）可豁免，但需运行已有测试套件确认无回归
 - 使用测试工具（如`Playwright`）在涉及创建文件的场景（如截图），应该将创建的文件放置到项目根目录`temp/`目录下
-
-
-
-
-
-

@@ -51,7 +51,7 @@ export class SettingsPage {
    * 导航到设置页面
    */
   async goto(): Promise<void> {
-    await this.page.goto('http://localhost:5173/settings')
+    await this.page.goto('http://localhost:3000/settings')
   }
 
   /**

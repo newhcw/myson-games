@@ -451,6 +451,49 @@ onUnmounted(() => {
     renderer.dispose()
   }
 })
+
+
+// ==============================================
+// 👇 👇 👇 从这里开始复制，全部粘贴进去 👇 👇 👇
+// ==============================================
+// ==============================================
+// 修复版：无 process.env，直接兼容你的项目
+// ==============================================
+onMounted(() => {
+  // @ts-ignore 挂载全局测试 API
+  window.__testApi = {
+    // 获取所有活跃敌人
+    getEnemies: () => {
+      if (!enemyManagerRef) return []
+      return enemyManagerRef.getActiveEnemies() || []
+    },
+
+    // 射击指定索引敌人
+    shootEnemy: (index: number) => {
+      if (!enemyManagerRef) return false
+      const enemies = enemyManagerRef.getActiveEnemies()
+      const enemy = enemies[index]
+      if (!enemy) return false
+
+      // 造成大量伤害，直接击杀
+      enemyManagerRef.onEnemyHit(enemy.id, 999)
+      return true
+    },
+
+    // 手动触发敌人受伤效果
+    hitEnemy: (index: number, damage: number = 10) => {
+      if (!enemyManagerRef) return false
+      const enemies = enemyManagerRef.getActiveEnemies()
+      const enemy = enemies[index]
+      if (!enemy) return false
+
+      enemyManagerRef.onEnemyHit(enemy.id, damage)
+      return true
+    }
+  }
+})
+
+
 </script>
 
 <template>
@@ -542,9 +585,12 @@ onUnmounted(() => {
 .game-room {
   width: 100%;
   height: 100vh;
-  background: #1a1a1a;
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  overflow: hidden;
   cursor: pointer;
+  background: #000;
 }
 
 .loading {

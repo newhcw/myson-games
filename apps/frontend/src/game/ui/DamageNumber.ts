@@ -111,7 +111,6 @@ export class DamageNumberManager {
         }
 
         // 更新位置
-        const progress = elapsed / damage.lifetime
         damage.currentY = damage.startY + (damage.velocity * elapsed / 16) // 假设60fps
 
         // 更新透明度（最后0.3秒淡出）

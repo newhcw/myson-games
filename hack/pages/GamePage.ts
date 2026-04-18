@@ -57,7 +57,7 @@ export class GamePage {
    * 导航到游戏页面
    */
   async goto(): Promise<void> {
-    await this.page.goto('http://localhost:5173/game')
+    await this.page.goto('http://localhost:3000/game')
   }
 
   /**
@@ -105,5 +105,68 @@ export class GamePage {
    */
   async clickExitButton(): Promise<void> {
     await this.clickExit()
+  }
+
+  /**
+   * 获取所有敌人元素
+   */
+  async getEnemies() {
+    // 等待游戏加载完成
+    await this.expectLoaded()
+
+    // 通过测试API获取敌人信息
+    return await this.page.evaluate(() => {
+      // @ts-ignore - 测试API仅在开发环境可用
+      const testApi = window.__testApi
+      if (testApi && testApi.getEnemies) {
+        return testApi.getEnemies()
+      }
+      return []
+    })
+  }
+
+  /**
+   * 射击敌人
+   */
+  async shootEnemy(index: number) {
+    // 等待游戏加载完成
+    await this.expectLoaded()
+
+    // 通过测试API射击敌人
+    return await this.page.evaluate((index: number) => {
+      // @ts-ignore - 测试API仅在开发环境可用
+      const testApi = window.__testApi
+      if (testApi && testApi.shootEnemy) {
+        return testApi.shootEnemy(index)
+      }
+      return false
+    }, index)
+  }
+
+  /**
+   * 获取当前分数
+   */
+  async getCurrentScore(): Promise<number> {
+    const scoreText = await this.getScoreText()
+    const match = scoreText.match(/\d+/)
+    return match ? parseInt(match[0], 10) : 0
+  }
+
+  /**
+   * 获取当前击杀数
+   */
+  async getCurrentKills(): Promise<number> {
+    const killsText = await this.kills.textContent()
+    const match = killsText?.match(/\d+/)
+    return match ? parseInt(match[0], 10) : 0
+  }
+
+  /**
+   * 获取生命值数字
+   */
+  async getHealthValue(): Promise<number> {
+    const healthText = await this.getHealthText()
+    const match = healthText.match(/\d+/)
+    return match ? parseInt(match[0], 10) : 100
   }
 }

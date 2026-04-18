@@ -31,8 +31,10 @@ const initScene = () => {
 
   // Camera
   const aspect = containerRef.value.clientWidth / containerRef.value.clientHeight
-  camera.value = new THREE.PerspectiveCamera(75, aspect, 0.1, 1000)
-  camera.value.position.set(0, 1.6, 5)
+  camera.value = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000)
+  camera.value.position.set(0, 2, 10)
+  camera.value.lookAt(0, 0, 0)
+
 
   // Renderer
   renderer.value = new THREE.WebGLRenderer({
@@ -43,11 +45,24 @@ const initScene = () => {
   renderer.value.setPixelRatio(Math.min(window.devicePixelRatio, 2))
   renderer.value.shadowMap.enabled = true
   renderer.value.shadowMap.type = THREE.PCFSoftShadowMap
-
   containerRef.value.appendChild(renderer.value.domElement)
 
+  // 统一尺寸更新
+  const updateSize = () => {
+    if (!containerRef.value || !camera.value || !renderer.value) return
+    const w = containerRef.value.clientWidth
+    const h = containerRef.value.clientHeight
+    renderer.value.setSize(w, h)
+    renderer.value.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    camera.value.aspect = w / h
+    camera.value.updateProjectionMatrix()
+  }
+  // 初始化立即正确尺寸
+  updateSize()
+
+
   // Lights
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7)
   scene.value.add(ambientLight)
 
   const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
@@ -70,6 +85,9 @@ const initScene = () => {
 
   // Emit ready event
   emit('scene-ready', scene.value, camera.value, renderer.value)
+
+  // 刚进页面强制再刷一次尺寸
+  setTimeout(updateSize, 100)
 }
 
 const animate = () => {
@@ -123,6 +141,8 @@ defineExpose({
 .scene-container {
   width: 100%;
   height: 100%;
-  overflow: hidden;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 </style>

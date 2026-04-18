@@ -51,7 +51,7 @@ hack/tests/
 Every test file MUST follow the pattern:
 
 ```
-TC{NNNN}-{brief-name}.ts
+TC{NNNN}-{brief-name}.spec.ts
 ```
 
 | Component      | Format         | Example                         |
@@ -69,7 +69,6 @@ TC{NNNN}-{brief-name}.ts
 **Rules:**
 - One test case (one `test.describe` block) per file.
 - The TC ID is **globally unique** across all modules.
-- No `.spec.ts` suffix — use plain `.ts`.
 
 ---
 
