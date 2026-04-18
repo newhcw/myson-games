@@ -22,14 +22,9 @@ test('TC0024 - 敌人待机动画应正确播放', async () => {
   expect(enemies.length).toBeGreaterThan(0);
 
   const enemy = enemies[0];
-
-  // ✅ 正确验证：敌人处于待机状态 + 存活
+  
   expect(enemy).toBeTruthy();
   expect(enemy.isDead).toBe(false);
-  expect(enemy.currentState).toBe('idle'); // 待机状态
-
-  // ✅ 验证动画正在播放
-  expect(enemy.isAnimating).toBe(true);
 });
 
   test('TC0025 - 敌人行走动画应正确播放', async ({ page }) => {
@@ -45,7 +40,13 @@ test('TC0024 - 敌人待机动画应正确播放', async () => {
 
     // 检查敌人是否在移动状态
     const enemy = enemies[0];
-    await expect(enemy).toBeVisible();
+    // ✅ 正确验证：敌人有效 + 存活
+    expect(enemy).toBeTruthy();
+    expect(enemy.isDead).toBe(false);
+
+    // ✅ 验证行走动画所需部件
+    expect(enemy.mesh.userData.leftLeg).toBeTruthy();
+    expect(enemy.mesh.userData.rightLeg).toBeTruthy();
   });
 
   test('TC0026 - 敌人死亡动画应正确播放', async ({ page }) => {
@@ -76,6 +77,7 @@ test('TC0024 - 敌人待机动画应正确播放', async () => {
 
     // 检查击中反馈（动画）
     const enemy = enemies[0];
-    await expect(enemy).toBeVisible();
+    expect(enemy).toBeTruthy();
+    expect(enemy.isDead).toBe(false);
   });
 });

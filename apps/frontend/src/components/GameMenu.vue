@@ -41,20 +41,28 @@
 </template>
 
 <script setup>
+
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
+
 const startGame = () => {
   console.log('开始游戏')
   // 实现游戏开始逻辑
-  
+   router.push('/game') // 跳转到 FPS 游戏
 }
 
 const showSettings = () => {
   console.log('显示设置')
   // 实现设置界面逻辑
+    router.push('/settings') // 跳转到设置界面
 }
 
 const exitGame = () => {
   console.log('退出游戏')
   // 实现退出游戏逻辑
+    router.push('/goodbye') // 跳转到退出界面
+
 }
 </script>
 
