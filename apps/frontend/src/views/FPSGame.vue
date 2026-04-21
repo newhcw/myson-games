@@ -9,6 +9,8 @@ import { useWeaponStore } from '@/stores/weapon'
 import { useGameStore } from '@/stores/game'
 import { DEFAULT_WEAPONS } from '@/game/weapons/types'
 import { soundManager } from '@/game/sound/SoundManager'
+import { damageFeedback } from '@/game/ui/DamageFeedback'
+import DeathScreen from '@/game/ui/DeathScreen.vue'
 
 const router = useRouter()
 const isLoading = ref(true)
@@ -77,8 +79,11 @@ let enemyManagerRef: any = null
 
 // 处理玩家被击中
 const onPlayerHit = (damage: number) => {
-  gameStore.health = Math.max(0, gameStore.health - damage)
+  gameStore.takeDamage(damage)
   soundManager.playHit()
+  // 显示伤害反馈
+  damageFeedback.showDamageEffect(damage)
+  damageFeedback.showDamageNumber(damage)
 }
 
 // 处理敌人被击杀
@@ -400,6 +405,26 @@ const exitGame = () => {
   router.push({ name: 'Home' })
 }
 
+// 死亡界面相关
+const showDeathScreen = computed(() => gameStore.isDead)
+
+const onRestart = () => {
+  // 重置游戏状态
+  gameStore.fullReset()
+  // 重置玩家位置
+  playerPosition.set(0, 1.6, 0)
+  // 重置视角
+  yaw = 0
+  pitch = 0
+  if (camera) {
+    camera.rotation.set(0, 0, 0)
+  }
+}
+
+const onGoHome = () => {
+  exitGame()
+}
+
 // Track previous states for sound effects
 let previousReloadState = false
 let previousScopeActive = false
@@ -532,7 +557,14 @@ onMounted(() => {
         <div class="health-bar">
           <span class="label">生命值</span>
           <div class="bar">
-            <div class="fill" :style="{ width: healthPercent + '%' }"></div>
+            <div
+              class="fill"
+              :class="{
+                warning: healthPercent <= 50 && healthPercent > 20,
+                danger: healthPercent <= 20
+              }"
+              :style="{ width: healthPercent + '%' }"
+            ></div>
           </div>
         </div>
         <div class="score">
@@ -578,6 +610,14 @@ onMounted(() => {
     </div>
 
     <button class="exit-btn" @click.stop="exitGame">退出游戏</button>
+
+    <!-- 死亡界面 -->
+    <DeathScreen
+      :visible="showDeathScreen"
+      :survival-time="gameStore.gameTime"
+      @restart="onRestart"
+      @go-home="onGoHome"
+    />
   </div>
 </template>
 
@@ -652,7 +692,17 @@ onMounted(() => {
   height: 100%;
   background: linear-gradient(90deg, #34C759, #30D158);
   border-radius: 10px;
-  transition: width 0.3s;
+  transition: width 0.3s ease-out, background 0.3s ease-out;
+}
+
+/* 血量低于50%变黄 */
+.health-bar .fill.warning {
+  background: linear-gradient(90deg, #FF9500, #FF6B00);
+}
+
+/* 血量低于20%变红 */
+.health-bar .fill.danger {
+  background: linear-gradient(90deg, #FF3B30, #FF2D55);
 }
 
 .score {

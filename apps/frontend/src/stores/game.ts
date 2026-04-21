@@ -24,6 +24,7 @@ export const useGameStore = defineStore('game', () => {
   // Computed
   const isPlaying = computed(() => gameState.value === 'playing')
   const isPaused = computed(() => gameState.value === 'paused')
+  const isDead = computed(() => gameState.value === 'ended')
 
   // Actions
   const startGame = () => {
@@ -93,14 +94,22 @@ export const useGameStore = defineStore('game', () => {
     gameTime.value = 0
   }
 
+  // 完全重置游戏（用于死亡后重新开始）
+  const fullReset = () => {
+    resetGame()
+    startGame()
+  }
+
   return {
     gameState,
     score,
     kills,
     gameTime,
     health,
+    maxHealth,
     isPlaying,
     isPaused,
+    isDead,
     startGame,
     pauseGame,
     resumeGame,
@@ -109,5 +118,6 @@ export const useGameStore = defineStore('game', () => {
     addScore,
     addKill,
     resetGame,
+    fullReset,
   }
 })

@@ -3,6 +3,7 @@ import type { Enemy } from './types'
 import { ENEMY_CONFIGS } from './types'
 import { createEnemyMesh, playIdleAnimation, playWalkAnimation, playChaseAnimation, playHitAnimation, playDeathAnimation, updateEnemyPosition } from './EnemyRenderer'
 import { EnemyHealthBar } from './EnemyHealthBar'
+import { enemyShooter, ENEMY_SHOOT_CONFIG } from './EnemyShooter'
 
 export interface EnemyAIOptions {
   playerPosition: THREE.Vector3
@@ -138,12 +139,9 @@ export class EnemyAI {
       // 行为更新
       this.updateEnemyBehavior(enemy, playerPosition, delta, time)
 
-      // 攻击玩家
+      // 远程射击（追逐或攻击状态下）
       if (enemy.state === 'chase' || enemy.state === 'attack') {
-        const distance = enemy.position.distanceTo(playerPosition)
-        if (distance < 1.5) {
-          this.attackPlayer(enemy, onPlayerHit)
-        }
+        this.tryShootPlayer(enemy, playerPosition, onPlayerHit)
       }
 
       // 更新模型位置
@@ -272,14 +270,25 @@ export class EnemyAI {
     }
   }
 
-  // 攻击玩家
-  private attackPlayer(enemy: Enemy, onPlayerHit: (damage: number) => void) {
+  // 尝试远程射击玩家
+  private tryShootPlayer(enemy: Enemy, playerPosition: THREE.Vector3, onPlayerHit: (damage: number) => void) {
     const now = Date.now()
-    const attackInterval = 1000 // 1秒攻击一次
 
-    if (now - enemy.lastAttackTime > attackInterval) {
+    if (now - enemy.lastAttackTime < ENEMY_SHOOT_CONFIG.attackInterval) {
+      return // 还在冷却中
+    }
+
+    // 检查是否可以射击（距离、角度）
+    if (!enemyShooter.canShoot(enemy, playerPosition)) {
+      return
+    }
+
+    // 执行射击
+    const result = enemyShooter.shootAtPlayer(enemy, playerPosition, null)
+
+    if (result.hit) {
       enemy.lastAttackTime = now
-      onPlayerHit(enemy.config.damage)
+      onPlayerHit(result.damage)
     }
   }
 
