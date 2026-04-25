@@ -1,5 +1,17 @@
 import * as THREE from 'three'
 
+// 弹道子弹外观类型
+export type ProjectileVisual = 'star' | 'crystal' | 'fireball'
+
+// BOSS 特殊攻击配置
+export interface SpecialAttackConfig {
+  type: 'fan' // 扇形弹幕
+  projectileCount: number // 弹幕子弹数量
+  fanAngle: number // 扇形扩散角度（度）
+  cooldown: number // 冷却时间（毫秒）
+  warningDuration: number // 预警时间（毫秒）
+}
+
 export interface EnemyConfig {
   id: string
   name: string
@@ -11,6 +23,14 @@ export interface EnemyConfig {
   patrolRadius: number
   damage: number
   scoreValue: number // 击杀得分
+  // 弹道投射物参数
+  projectileSpeed: number // 子弹飞行速度（单位/秒）
+  projectileSpread: number // 散布角度（度）
+  attackInterval: number // 攻击间隔（毫秒）
+  projectileVisual: ProjectileVisual // 子弹外观类型
+  burstCount: number // 每次射击发射的子弹数
+  // BOSS 专属
+  specialAttack?: SpecialAttackConfig // 特殊攻击配置
 }
 
 // 敌人配置
@@ -24,8 +44,13 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     viewDistance: 15,
     viewAngle: Math.PI / 3, // 60度
     patrolRadius: 10,
-    damage: 10,
+    damage: 5, // 弹道模式下降低单发伤害，靠射速弥补
     scoreValue: 100,
+    projectileSpeed: 20, // 快速子弹
+    projectileSpread: 8, // 散布较大
+    attackInterval: 400, // 快速连射 400ms
+    projectileVisual: 'star', // 小星星
+    burstCount: 1,
   },
   elite: {
     id: 'elite',
@@ -36,8 +61,13 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     viewDistance: 20,
     viewAngle: Math.PI / 2.5, // 约72度
     patrolRadius: 15,
-    damage: 20,
+    damage: 40, // 蓄力高伤害
     scoreValue: 300,
+    projectileSpeed: 14, // 中等速度
+    projectileSpread: 2, // 很精准
+    attackInterval: 2000, // 慢速蓄力射击
+    projectileVisual: 'crystal', // 水晶弹
+    burstCount: 1,
   },
   boss: {
     id: 'boss',
@@ -50,6 +80,18 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     patrolRadius: 8,
     damage: 30,
     scoreValue: 1000,
+    projectileSpeed: 8, // 慢速大火球
+    projectileSpread: 3, // 较准
+    attackInterval: 1000, // 每秒一发
+    projectileVisual: 'fireball', // 大火球
+    burstCount: 1,
+    specialAttack: {
+      type: 'fan',
+      projectileCount: 6, // 6发弹幕
+      fanAngle: 60, // 60度扇形
+      cooldown: 8000, // 8秒冷却
+      warningDuration: 2000, // 2秒预警
+    },
   },
 }
 
@@ -72,6 +114,14 @@ export interface Enemy {
   lastAttackTime: number
   isDead: boolean
   spawnTime: number // 生成时间，用于重生
+  // 蓄力攻击（精英）
+  isCharging: boolean
+  chargeStartTime: number
+  chargeLine: THREE.Line | null // 蓄力瞄准线
+  // BOSS 大招
+  lastSpecialAttackTime: number
+  // BOSS 大招预警特效
+  warningRing: THREE.Mesh | null
 }
 
 // 敌人管理
@@ -104,6 +154,11 @@ export class EnemyManager {
       lastAttackTime: 0,
       isDead: false,
       spawnTime: Date.now(),
+      isCharging: false,
+      chargeStartTime: 0,
+      chargeLine: null,
+      lastSpecialAttackTime: 0,
+      warningRing: null,
     }
 
     // 生成巡逻路径点

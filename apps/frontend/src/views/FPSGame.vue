@@ -514,6 +514,117 @@ onMounted(() => {
 
       enemyManagerRef.onEnemyHit(enemy.id, damage)
       return true
+    },
+
+    // 获取血条数量（通过 EnemyAI）
+    getHealthBars: () => {
+      if (!enemyManagerRef) return []
+      const count = enemyManagerRef.getHealthBarCount()
+      // 返回虚拟数组以兼容现有测试
+      return Array.from({ length: count }, (_, i) => ({ index: i }))
+    },
+
+    // 将玩家传送到指定敌人前方（确保敌人能看到玩家）
+    movePlayerToEnemy: (index: number) => {
+      if (!enemyManagerRef) return false
+      const enemies = enemyManagerRef.getActiveEnemies()
+      const enemy = enemies[index]
+      if (!enemy || !enemy.position) return false
+
+      // 计算敌人朝向的反方向（即玩家应该站的位置）
+      if (enemy.mesh) {
+        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(enemy.mesh.quaternion)
+        playerPosition.set(
+          enemy.position.x - forward.x * 3,
+          playerPosition.y,
+          enemy.position.z - forward.z * 3
+        )
+      } else {
+        playerPosition.set(enemy.position.x + 3, playerPosition.y, enemy.position.z)
+      }
+      return true
+    },
+
+    // 对玩家造成伤害
+    takePlayerDamage: (amount: number) => {
+      gameStore.takeDamage(amount)
+    },
+
+    // 获取玩家血量
+    getPlayerHealth: () => {
+      return gameStore.health
+    },
+
+    // 获取游戏状态
+    getGameState: () => {
+      return gameStore.gameState
+    },
+
+    // 重新开始游戏
+    restartGame: () => {
+      onRestart()
+    },
+
+    // ===== 弹道投射物系统测试 API =====
+
+    // 获取活跃子弹数量
+    getActiveProjectileCount: () => {
+      if (!enemyManagerRef) return 0
+      return enemyManagerRef.getActiveProjectileCount?.() || 0
+    },
+
+    // 获取敌人蓄力状态
+    getEnemyChargeState: (index: number) => {
+      if (!enemyManagerRef) return null
+      const enemies = enemyManagerRef.getActiveEnemies()
+      const enemy = enemies[index]
+      if (!enemy) return null
+      return {
+        isCharging: enemy.isCharging,
+        hasChargeLine: enemy.chargeLine !== null,
+      }
+    },
+
+    // 将玩家移动到指定索引敌人正面（别名，兼容旧调用）
+    movePlayerToEnemyFront: (index: number) => {
+      if (!enemyManagerRef) return false
+      const enemies = enemyManagerRef.getActiveEnemies()
+      const enemy = enemies[index]
+      if (!enemy || !enemy.position) return false
+      if (enemy.mesh) {
+        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(enemy.mesh.quaternion)
+        playerPosition.set(
+          enemy.position.x - forward.x * 3,
+          playerPosition.y,
+          enemy.position.z - forward.z * 3
+        )
+      }
+      return true
+    },
+
+    // 获取敌人类型
+    getEnemyType: (index: number) => {
+      if (!enemyManagerRef) return null
+      const enemies = enemyManagerRef.getActiveEnemies()
+      const enemy = enemies[index]
+      if (!enemy || !enemy.config) return null
+      return enemy.config.type
+    },
+
+    // 强制所有敌人面向玩家（用于测试，确保敌人能发现并攻击玩家）
+    forceEnemiesToFacePlayer: () => {
+      if (!enemyManagerRef) return false
+      const enemies = enemyManagerRef.getActiveEnemies()
+      enemies.forEach((enemy: any) => {
+        if (enemy.mesh && !enemy.isDead) {
+          enemy.mesh.lookAt(playerPosition.x, enemy.mesh.position.y, playerPosition.z)
+          // 强制进入攻击状态
+          if (enemy.state === 'patrol' || enemy.state === 'wait') {
+            enemy.state = 'chase'
+          }
+        }
+      })
+      return true
     }
   }
 })

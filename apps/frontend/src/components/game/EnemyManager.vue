@@ -8,6 +8,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import * as THREE from 'three'
 import { enemyAI } from '@/game/enemies/EnemyAI'
+import { ProjectileManager } from '@/game/enemies/ProjectileManager'
 
 interface Props {
   scene: THREE.Scene
@@ -25,6 +26,7 @@ const emit = defineEmits<{
 const containerRef = ref<HTMLDivElement | null>(null)
 let enemies: string[] = []
 let animationTime = 0
+let projectileManager: ProjectileManager | null = null
 
 // 生成初始敌人
 const spawnInitialEnemies = () => {
@@ -50,8 +52,14 @@ const spawnInitialEnemies = () => {
 const update = (delta: number) => {
   animationTime += delta
 
-  // 更新敌人 AI
+  // 更新敌人 AI（子弹生成 + 蓄力 + 大招）
   enemyAI.update(delta, props.playerPosition, animationTime)
+
+  // 更新子弹管理器（飞行运动 + 碰撞检测）
+  if (projectileManager) {
+    projectileManager.setPlayerPosition(props.playerPosition)
+    projectileManager.update(delta)
+  }
 }
 
 // 存储敌人的初始位置和类型
@@ -105,6 +113,14 @@ onMounted(() => {
       }
     })
 
+    // 初始化子弹管理器
+    projectileManager = new ProjectileManager(100)
+    projectileManager.setScene(enemyGroup)
+    projectileManager.setOnPlayerHit((damage: number) => {
+      emit('player-hit', damage)
+    })
+    enemyAI.setProjectileManager(projectileManager)
+
     // 生成初始敌人
     spawnInitialEnemies()
   }
@@ -117,13 +133,17 @@ onMounted(() => {
 
 onUnmounted(() => {
   enemyAI.clear()
+  projectileManager?.clear()
 })
 
 // 暴露方法给父组件
 defineExpose({
   update,
   onEnemyHit,
-  getActiveEnemies: () => enemyAI.getActiveEnemies()
+  getActiveEnemies: () => enemyAI.getActiveEnemies(),
+  getHealthBarCount: () => enemyAI.getHealthBarCount(),
+  getProjectileManager: () => projectileManager,
+  getActiveProjectileCount: () => projectileManager?.getActiveCount() || 0
 })
 </script>
 

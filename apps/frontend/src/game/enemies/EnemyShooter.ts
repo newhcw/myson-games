@@ -83,10 +83,8 @@ export class EnemyShooter {
     const offsetAngle = (Math.random() - 0.5) * 2 * ENEMY_SHOOT_CONFIG.accuracyOffset
     const offsetRad = (offsetAngle * Math.PI) / 180
 
-    // 随机偏移方向（在垂直平面上偏移）
+    // 随机偏移方向（水平偏移）
     const upVector = new THREE.Vector3(0, 1, 0)
-    const perpendicular = new THREE.Vector3().crossVectors(direction, upVector).normalize()
-
     direction.applyAxisAngle(upVector, offsetRad)
 
     // 设置射线
@@ -104,12 +102,18 @@ export class EnemyShooter {
           enemy,
         }
       }
+      // 有玩家 mesh 但射线没命中
+      return {
+        hit: false,
+        damage: 0,
+        enemy,
+      }
     }
 
-    // 未命中（也可以用于检测障碍物遮挡等其他逻辑）
+    // 没有玩家 mesh（FPS 模式，玩家即摄像机），canShoot() 已验证距离和角度，直接命中
     return {
-      hit: false,
-      damage: 0,
+      hit: true,
+      damage: enemy.config.damage,
       enemy,
     }
   }

@@ -16,6 +16,15 @@ export class EnemyHealthBar {
     this.damageManager = new DamageNumberManager(camera)
   }
 
+  // 敌人类型名称和颜色映射
+  private getTypeLabel(type: string): { text: string; color: string } {
+    switch (type) {
+      case 'boss': return { text: 'BOSS', color: '#FF4444' }
+      case 'elite': return { text: '精英', color: '#BB86FC' }
+      default: return { text: '小兵', color: '#64B5F6' }
+    }
+  }
+
   // 创建血条元素
   private createHealthBarElement(enemy: Enemy): HealthBarElement {
     const wrapper = document.createElement('div')
@@ -23,12 +32,29 @@ export class EnemyHealthBar {
     wrapper.style.transform = 'translate(-50%, -50%)'
     wrapper.style.zIndex = '1000'
     wrapper.style.pointerEvents = 'none'
+    wrapper.style.display = 'flex'
+    wrapper.style.flexDirection = 'column'
+    wrapper.style.alignItems = 'center'
 
+    // 类型标签
+    const typeLabel = document.createElement('div')
+    const typeInfo = this.getTypeLabel(enemy.config.type)
+    typeLabel.textContent = typeInfo.text
+    typeLabel.style.fontSize = enemy.config.type === 'boss' ? '16px' : enemy.config.type === 'elite' ? '13px' : '11px'
+    typeLabel.style.fontWeight = 'bold'
+    typeLabel.style.color = typeInfo.color
+    typeLabel.style.textShadow = '1px 1px 3px rgba(0, 0, 0, 0.9)'
+    typeLabel.style.marginBottom = '2px'
+    typeLabel.style.letterSpacing = '1px'
+    wrapper.appendChild(typeLabel)
+
+    // 血条背景
+    const barWidth = enemy.config.type === 'boss' ? '90px' : enemy.config.type === 'elite' ? '72px' : '54px'
     const background = document.createElement('div')
-    background.style.width = '60px'
-    background.style.height = '6px'
+    background.style.width = barWidth
+    background.style.height = enemy.config.type === 'boss' ? '8px' : '6px'
     background.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'
-    background.style.borderRadius = '3px'
+    background.style.borderRadius = '4px'
     background.style.overflow = 'hidden'
     background.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.3)'
 
@@ -43,14 +69,11 @@ export class EnemyHealthBar {
 
     // 血量数字
     const healthText = document.createElement('div')
-    healthText.style.position = 'absolute'
-    healthText.style.top = '-20px'
-    healthText.style.left = '50%'
-    healthText.style.transform = 'translateX(-50%)'
-    healthText.style.fontSize = '12px'
+    healthText.style.fontSize = enemy.config.type === 'boss' ? '13px' : '11px'
     healthText.style.fontWeight = 'bold'
     healthText.style.color = 'white'
     healthText.style.textShadow = '1px 1px 2px rgba(0, 0, 0, 0.8)'
+    healthText.style.marginTop = '1px'
     healthText.textContent = `${enemy.health}/${enemy.maxHealth}`
 
     wrapper.appendChild(healthText)
@@ -62,6 +85,7 @@ export class EnemyHealthBar {
       background,
       fill,
       healthText,
+      typeLabel,
       visible: false
     }
   }
@@ -91,10 +115,11 @@ export class EnemyHealthBar {
     const shouldShow = enemy.health < enemy.maxHealth && !enemy.isDead
 
     if (shouldShow) {
-      // 获取敌人头顶位置
+      // 根据敌人体型计算头顶偏移量
+      const headOffset = enemy.config.type === 'boss' ? 3.2 : enemy.config.type === 'elite' ? 2.3 : 2.0
       const enemyTop = new THREE.Vector3(
         enemy.mesh.position.x,
-        enemy.mesh.position.y + 2, // 头顶上方
+        enemy.mesh.position.y + headOffset,
         enemy.mesh.position.z
       )
 
@@ -110,7 +135,7 @@ export class EnemyHealthBar {
         screenPosition.y <= window.innerHeight
 
       if (isInFront && isInScreen) {
-        healthBar.wrapper.style.display = 'block'
+        healthBar.wrapper.style.display = 'flex'
         healthBar.wrapper.style.left = `${screenPosition.x}px`
         healthBar.wrapper.style.top = `${screenPosition.y}px`
 
@@ -122,9 +147,11 @@ export class EnemyHealthBar {
         // 更新血量文字
         healthBar.healthText.textContent = `${enemy.health}/${enemy.maxHealth}`
 
-        // 根据距离调整大小
+        // 根据距离和敌人体型调整大小
         const distance = this.camera.position.distanceTo(enemy.position)
-        const scale = Math.max(0.5, Math.min(1, 20 / distance))
+        const baseScale = Math.max(0.6, Math.min(1.2, 25 / distance))
+        const typeScale = enemy.config.type === 'boss' ? 1.3 : enemy.config.type === 'elite' ? 1.1 : 1.0
+        const scale = baseScale * typeScale
         healthBar.wrapper.style.transform = `translate(-50%, -50%) scale(${scale})`
 
         healthBar.visible = true
@@ -185,5 +212,6 @@ interface HealthBarElement {
   background: HTMLDivElement
   fill: HTMLDivElement
   healthText: HTMLDivElement
+  typeLabel: HTMLDivElement
   visible: boolean
 }

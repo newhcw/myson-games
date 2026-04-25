@@ -1,9 +1,10 @@
 import * as THREE from 'three'
 import type { Enemy } from './types'
 import { ENEMY_CONFIGS } from './types'
-import { createEnemyMesh, playIdleAnimation, playWalkAnimation, playChaseAnimation, playHitAnimation, playDeathAnimation, updateEnemyPosition } from './EnemyRenderer'
+import { createEnemyMesh, playIdleAnimation, playWalkAnimation, playChaseAnimation, playHitAnimation, playDeathAnimation, updateEnemyPosition, updateBossEffects } from './EnemyRenderer'
 import { EnemyHealthBar } from './EnemyHealthBar'
-import { enemyShooter, ENEMY_SHOOT_CONFIG } from './EnemyShooter'
+import { enemyShooter } from './EnemyShooter'
+import { ProjectileManager } from './ProjectileManager'
 
 export interface EnemyAIOptions {
   playerPosition: THREE.Vector3
@@ -20,6 +21,7 @@ export class EnemyAI {
   private searchTimeout: Map<string, number> = new Map() // 敌人ID -> 开始搜索的时间
   private healthBar: EnemyHealthBar | null = null
   private _camera: THREE.Camera | null = null
+  private projectileManager: ProjectileManager | null = null
 
   // 生成敌人
   spawnEnemy(type: keyof typeof ENEMY_CONFIGS, position: THREE.Vector3): Enemy {
@@ -39,6 +41,11 @@ export class EnemyAI {
       lastAttackTime: 0,
       isDead: false,
       spawnTime: Date.now(),
+      isCharging: false,
+      chargeStartTime: 0,
+      chargeLine: null,
+      lastSpecialAttackTime: 0,
+      warningRing: null,
     }
 
     // 创建3D模型
@@ -80,6 +87,11 @@ export class EnemyAI {
   // 设置选项
   setOptions(options: EnemyAIOptions) {
     this.options = options
+  }
+
+  // 设置子弹管理器
+  setProjectileManager(manager: ProjectileManager) {
+    this.projectileManager = manager
   }
 
   // 生成巡逻路径点
@@ -139,8 +151,18 @@ export class EnemyAI {
       // 行为更新
       this.updateEnemyBehavior(enemy, playerPosition, delta, time)
 
-      // 远程射击（追逐或攻击状态下）
-      if (enemy.state === 'chase' || enemy.state === 'attack') {
+      // 处理蓄力攻击（精英）
+      if (enemy.isCharging) {
+        this.updateChargeAttack(enemy, playerPosition)
+      }
+
+      // BOSS 大招逻辑
+      if (enemy.config.specialAttack) {
+        this.updateBossSpecialAttack(enemy, playerPosition, time)
+      }
+
+      // 远程射击（追逐或攻击状态下，非蓄力中）
+      if ((enemy.state === 'chase' || enemy.state === 'attack') && !enemy.isCharging) {
         this.tryShootPlayer(enemy, playerPosition, onPlayerHit)
       }
 
@@ -166,6 +188,9 @@ export class EnemyAI {
       if (this.healthBar) {
         this.healthBar.update(enemy)
       }
+
+      // 更新BOSS粒子特效
+      updateBossEffects(enemy, time)
     })
   }
 
@@ -270,12 +295,14 @@ export class EnemyAI {
     }
   }
 
-  // 尝试远程射击玩家
-  private tryShootPlayer(enemy: Enemy, playerPosition: THREE.Vector3, onPlayerHit: (damage: number) => void) {
+  // 尝试远程射击玩家（弹道投射物模式）
+  private tryShootPlayer(enemy: Enemy, playerPosition: THREE.Vector3, _onPlayerHit: (damage: number) => void) {
     const now = Date.now()
+    const config = enemy.config
 
-    if (now - enemy.lastAttackTime < ENEMY_SHOOT_CONFIG.attackInterval) {
-      return // 还在冷却中
+    // 冷却检查（使用敌人自身配置的 attackInterval）
+    if (now - enemy.lastAttackTime < config.attackInterval) {
+      return
     }
 
     // 检查是否可以射击（距离、角度）
@@ -283,12 +310,204 @@ export class EnemyAI {
       return
     }
 
-    // 执行射击
-    const result = enemyShooter.shootAtPlayer(enemy, playerPosition, null)
+    // 精英：进入蓄力状态
+    if (config.type === 'elite') {
+      this.startChargeAttack(enemy, playerPosition)
+      return
+    }
 
-    if (result.hit) {
+    // 小兵 / BOSS：直接发射子弹
+    this.fireProjectile(enemy, playerPosition)
+    enemy.lastAttackTime = now
+  }
+
+  /** 发射一颗子弹 */
+  private fireProjectile(enemy: Enemy, playerPosition: THREE.Vector3): void {
+    if (!this.projectileManager) return
+
+    const config = enemy.config
+    const direction = new THREE.Vector3().subVectors(playerPosition, enemy.position).normalize()
+    const spawnPos = enemy.position.clone().add(new THREE.Vector3(0, 1, 0))
+
+    this.projectileManager.spawn({
+      position: spawnPos,
+      direction,
+      speed: config.projectileSpeed,
+      damage: config.damage,
+      visual: config.projectileVisual,
+      ownerId: enemy.id,
+      spreadAngle: config.projectileSpread,
+    })
+  }
+
+  // ========== 精英蓄力攻击 ==========
+
+  /** 开始蓄力攻击 */
+  private startChargeAttack(enemy: Enemy, playerPosition: THREE.Vector3): void {
+    enemy.isCharging = true
+    enemy.chargeStartTime = Date.now()
+
+    // 创建蓄力瞄准线
+    if (enemy.mesh && this.scene) {
+      const startPos = enemy.position.clone().add(new THREE.Vector3(0, 1, 0))
+      const dir = new THREE.Vector3().subVectors(playerPosition, enemy.position)
+      const endPos = startPos.clone().add(dir.normalize().multiplyScalar(20))
+
+      const points = [startPos, endPos]
+      const lineGeom = new THREE.BufferGeometry().setFromPoints(points)
+      const lineMat = new THREE.LineBasicMaterial({
+        color: 0xFF3333,
+        transparent: true,
+        opacity: 0.6,
+        linewidth: 1,
+      })
+      enemy.chargeLine = new THREE.Line(lineGeom, lineMat)
+      this.scene.add(enemy.chargeLine)
+    }
+  }
+
+  /** 更新蓄力攻击状态 */
+  private updateChargeAttack(enemy: Enemy, playerPosition: THREE.Vector3): void {
+    const now = Date.now()
+    const chargeDuration = now - enemy.chargeStartTime
+
+    // 更新瞄准线方向
+    if (enemy.chargeLine) {
+      const startPos = enemy.position.clone().add(new THREE.Vector3(0, 1, 0))
+      const dir = new THREE.Vector3().subVectors(playerPosition, enemy.position)
+      const endPos = startPos.clone().add(dir.normalize().multiplyScalar(20))
+      const positions = (enemy.chargeLine.geometry as THREE.BufferGeometry).attributes.position
+      positions.setXYZ(0, startPos.x, startPos.y, startPos.z)
+      positions.setXYZ(1, endPos.x, endPos.y, endPos.z)
+      positions.needsUpdate = true
+
+      // 蓄力进度让瞄准线闪烁
+      const progress = chargeDuration / 1500
+      if (progress > 0.7) {
+        (enemy.chargeLine.material as THREE.LineBasicMaterial).opacity = 0.4 + Math.sin(now * 0.02) * 0.3
+      }
+    }
+
+    // 检查玩家是否逃出射程
+    if (!enemyShooter.canShoot(enemy, playerPosition)) {
+      this.cancelChargeAttack(enemy)
+      return
+    }
+
+    // 蓄力完成（1500ms）
+    if (chargeDuration >= 1500) {
+      this.fireProjectile(enemy, playerPosition)
       enemy.lastAttackTime = now
-      onPlayerHit(result.damage)
+      this.cancelChargeAttack(enemy)
+    }
+  }
+
+  /** 取消蓄力攻击 */
+  private cancelChargeAttack(enemy: Enemy): void {
+    enemy.isCharging = false
+    enemy.chargeStartTime = 0
+
+    // 移除瞄准线
+    if (enemy.chargeLine && this.scene) {
+      this.scene.remove(enemy.chargeLine)
+      enemy.chargeLine.geometry.dispose()
+      ;(enemy.chargeLine.material as THREE.Material).dispose()
+      enemy.chargeLine = null
+    }
+  }
+
+  // ========== BOSS 大招 ==========
+
+  /** 更新 BOSS 大招逻辑 */
+  private updateBossSpecialAttack(enemy: Enemy, playerPosition: THREE.Vector3, _time: number): void {
+    const special = enemy.config.specialAttack
+    if (!special) return
+
+    const now = Date.now()
+
+    // 如果预警圆环存在，每帧更新扩散动画
+    if (enemy.warningRing) {
+      const elapsed = now - enemy.lastSpecialAttackTime
+      const progress = Math.min(elapsed / special.warningDuration, 1)
+      const currentRadius = 0.3 + progress * (1.5 - 0.3)
+      enemy.warningRing.geometry.dispose()
+      enemy.warningRing.geometry = new THREE.RingGeometry(0.3, currentRadius, 32)
+      return
+    }
+
+    // 检查大招冷却
+    if (now - enemy.lastSpecialAttackTime >= special.cooldown) {
+      // 检查是否在射击范围内
+      if (enemyShooter.canShoot(enemy, playerPosition)) {
+        this.startBossSpecialAttack(enemy)
+      }
+    }
+  }
+
+  /** 开始 BOSS 大招（预警） */
+  private startBossSpecialAttack(enemy: Enemy): void {
+    const special = enemy.config.specialAttack!
+    enemy.lastSpecialAttackTime = Date.now() // 进入冷却
+
+    // 创建地面预警圆环
+    if (this.scene) {
+      const ringGeom = new THREE.RingGeometry(0.3, 0.5, 32)
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xFF3333,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.7,
+      })
+      enemy.warningRing = new THREE.Mesh(ringGeom, ringMat)
+      enemy.warningRing.rotation.x = -Math.PI / 2
+      enemy.warningRing.position.copy(enemy.position)
+      enemy.warningRing.position.y = 0.05
+      this.scene.add(enemy.warningRing)
+    }
+
+    // 2 秒后发射弹幕
+    setTimeout(() => {
+      this.fireBossFanAttack(enemy)
+    }, special.warningDuration)
+  }
+
+  /** BOSS 扇形弹幕发射 */
+  private fireBossFanAttack(enemy: Enemy): void {
+    if (enemy.isDead || !this.projectileManager) return
+
+    // 清理预警圆环
+    if (enemy.warningRing && this.scene) {
+      this.scene.remove(enemy.warningRing)
+      enemy.warningRing.geometry.dispose()
+      ;(enemy.warningRing.material as THREE.Material).dispose()
+      enemy.warningRing = null
+    }
+
+    // 如果玩家在预警期间逃远了，不发射
+    const playerPos = this.lastPlayerPosition
+    if (!enemyShooter.canShoot(enemy, playerPos)) return
+
+    const special = enemy.config.specialAttack!
+    const count = special.projectileCount
+    const fanAngle = special.fanAngle
+    const direction = new THREE.Vector3().subVectors(playerPos, enemy.position).normalize()
+    const spawnPos = enemy.position.clone().add(new THREE.Vector3(0, 1, 0))
+
+    for (let i = 0; i < count; i++) {
+      // 在扇形范围内均匀分布
+      const angleOffset = (i / (count - 1) - 0.5) * (fanAngle * Math.PI / 180)
+      const dir = direction.clone()
+      dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), angleOffset)
+
+      this.projectileManager!.spawn({
+        position: spawnPos,
+        direction: dir,
+        speed: enemy.config.projectileSpeed,
+        damage: enemy.config.damage,
+        visual: enemy.config.projectileVisual,
+        ownerId: enemy.id,
+        spreadAngle: 0, // 弹幕不额外散布，角度已由扇形控制
+      })
     }
   }
 
@@ -348,9 +567,28 @@ export class EnemyAI {
     return this.getEnemies().filter(e => !e.isDead)
   }
 
+  // 获取血条数量
+  getHealthBarCount(): number {
+    return this.healthBar ? (this.healthBar as any).healthBars?.size || 0 : 0
+  }
+
   // 清理
   clear() {
     this.enemies.forEach(enemy => {
+      // 清理蓄力瞄准线
+      if (enemy.chargeLine) {
+        if (this.scene) this.scene.remove(enemy.chargeLine)
+        enemy.chargeLine.geometry.dispose()
+        ;(enemy.chargeLine.material as THREE.Material).dispose()
+        enemy.chargeLine = null
+      }
+      // 清理 BOSS 预警圆环
+      if (enemy.warningRing) {
+        if (this.scene) this.scene.remove(enemy.warningRing)
+        enemy.warningRing.geometry.dispose()
+        ;(enemy.warningRing.material as THREE.Material).dispose()
+        enemy.warningRing = null
+      }
       if (enemy.mesh && this.scene) {
         this.scene.remove(enemy.mesh)
       }
@@ -358,6 +596,7 @@ export class EnemyAI {
     this.enemies.clear()
     this.searchTimeout.clear()
     this.healthBar?.clear()
+    this.projectileManager?.clear()
   }
 }
 

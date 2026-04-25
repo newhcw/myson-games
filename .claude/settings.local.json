@@ -9,7 +9,13 @@
       "Bash(cat:*)",
       "Bash(mkdir:*)",
       "Bash(npx:*)",
-      "WebSearch"
+      "WebSearch",
+      "Skill(playwright-cli)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 *)",
+      "Bash(xargs kill *)",
+      "Bash(mkdir -p openspec/changes/archive)",
+      "Bash(mv openspec/changes/enemy-projectile-attack openspec/changes/archive/2026-04-25-enemy-projectile-attack)"
     ]
   }
 }

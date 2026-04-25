@@ -144,6 +144,20 @@ export class GamePage {
   }
 
   /**
+   * 对敌人造成指定伤害（不击杀）
+   */
+  async hitEnemy(index: number, damage: number = 10) {
+    await this.expectLoaded()
+    return await this.page.evaluate(({ index, damage }: { index: number, damage: number }) => {
+      const testApi = (window as any).__testApi
+      if (testApi && testApi.hitEnemy) {
+        return testApi.hitEnemy(index, damage)
+      }
+      return false
+    }, { index, damage })
+  }
+
+  /**
    * 获取当前分数
    */
   async getCurrentScore(): Promise<number> {
@@ -168,5 +182,91 @@ export class GamePage {
     const healthText = await this.getHealthText()
     const match = healthText.match(/\d+/)
     return match ? parseInt(match[0], 10) : 100
+  }
+
+  /**
+   * 获取所有血条元素
+   */
+  async getHealthBars() {
+    await this.expectLoaded()
+    return await this.page.evaluate(() => {
+      const testApi = (window as any).__testApi
+      if (testApi && testApi.getHealthBars) {
+        return testApi.getHealthBars()
+      }
+      return []
+    })
+  }
+
+  /**
+   * 将玩家移动到指定敌人附近
+   */
+  async movePlayerToEnemy(index: number) {
+    await this.expectLoaded()
+    return await this.page.evaluate((idx: number) => {
+      const testApi = (window as any).__testApi
+      if (testApi && testApi.movePlayerToEnemy) {
+        return testApi.movePlayerToEnemy(idx)
+      }
+      return false
+    }, index)
+  }
+
+  /**
+   * 对玩家造成伤害
+   */
+  async takePlayerDamage(amount: number) {
+    return await this.page.evaluate((dmg: number) => {
+      const testApi = (window as any).__testApi
+      if (testApi && testApi.takePlayerDamage) {
+        testApi.takePlayerDamage(dmg)
+      }
+    }, amount)
+  }
+
+  /**
+   * 获取玩家血量
+   */
+  async getPlayerHealth(): Promise<number> {
+    return await this.page.evaluate(() => {
+      const testApi = (window as any).__testApi
+      if (testApi && testApi.getPlayerHealth) {
+        return testApi.getPlayerHealth()
+      }
+      return 100
+    })
+  }
+
+  /**
+   * 获取游戏状态
+   */
+  async getGameState(): Promise<string> {
+    return await this.page.evaluate(() => {
+      const testApi = (window as any).__testApi
+      if (testApi && testApi.getGameState) {
+        return testApi.getGameState()
+      }
+      return 'idle'
+    })
+  }
+
+  /**
+   * 重新开始游戏
+   */
+  async restartGame() {
+    return await this.page.evaluate(() => {
+      const testApi = (window as any).__testApi
+      if (testApi && testApi.restartGame) {
+        testApi.restartGame()
+      }
+    })
+  }
+
+  /**
+   * 等待死亡界面出现
+   */
+  async waitForDeathScreen() {
+    const deathScreen = this.page.locator('.death-screen')
+    await deathScreen.waitFor({ state: 'visible', timeout: 10000 })
   }
 }

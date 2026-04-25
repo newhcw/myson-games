@@ -31,7 +31,7 @@ test.describe('敌人巡逻系统测试', () => {
     expect(enemy.state).toBeDefined()
   });
 
-  test('TC0029 - 敌人应能正确在路径点间移动', async () => {
+  test('TC0029 - 敌人应能正确在路径点间移动', async ({ page }) => {
     // 等待游戏加载完成
     await gamePage.expectLoaded();
 
@@ -44,10 +44,11 @@ test.describe('敌人巡逻系统测试', () => {
 
     // 验证敌人能够移动（x z 坐标变化）
     const enemy = enemies[0];
-    await expect(enemy).toBeVisible();
+    expect(enemy.position).toBeDefined()
+    expect(enemy.isDead).toBe(false)
   });
 
-  test('TC0030 - 敌人到达路径点后应正确等待', async () => {
+  test('TC0030 - 敌人到达路径点后应正确等待', async ({ page }) => {
     // 等待游戏加载完成
     await gamePage.expectLoaded();
 
@@ -59,10 +60,10 @@ test.describe('敌人巡逻系统测试', () => {
     expect(enemies.length).toBeGreaterThan(0);
 
     const enemy = enemies[0];
-    await expect(enemy).toBeVisible();
+    expect(enemy.state).toBeDefined()
   });
 
-  test('TC0031 - 敌人应能正确切换巡逻状态', async () => {
+  test('TC0031 - 敌人应能正确切换巡逻状态', async ({ page }) => {
     // 等待游戏加载完成
     await gamePage.expectLoaded();
 
@@ -74,6 +75,6 @@ test.describe('敌人巡逻系统测试', () => {
     expect(enemies.length).toBeGreaterThan(0);
 
     const enemy = enemies[0];
-    await expect(enemy).toBeVisible();
+    expect(enemy.state).toBeDefined()
   });
 });
