@@ -51,7 +51,7 @@ test.describe('敌人血条系统测试', () => {
     await gamePage.shootEnemy(0);
 
     // 等待一帧并验证血条变化
-    await page.waitForTimeout(500);
+    await gamePage.page.waitForTimeout(500);
 
     const healthBars = await gamePage.getHealthBars();
     expect(healthBars.length).toBeGreaterThan(0);
@@ -68,7 +68,7 @@ test.describe('敌人血条系统测试', () => {
     await gamePage.shootEnemy(0);
 
     // 检查伤害数字是否显示
-    await page.waitForTimeout(500);
+    await gamePage.page.waitForTimeout(500);
 
     const healthBars = await gamePage.getHealthBars();
     expect(healthBars.length).toBeGreaterThan(0);

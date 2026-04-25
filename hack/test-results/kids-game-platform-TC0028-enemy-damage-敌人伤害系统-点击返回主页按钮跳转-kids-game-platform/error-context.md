@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: kids-game-platform\TC0028-enemy-damage.spec.ts >> 敌人伤害系统 >> 点击重新开始按钮重置游戏
-- Location: tests\e2e\kids-game-platform\TC0028-enemy-damage.spec.ts:100:3
+- Name: kids-game-platform\TC0028-enemy-damage.spec.ts >> 敌人伤害系统 >> 点击返回主页按钮跳转
+- Location: tests\e2e\kids-game-platform\TC0028-enemy-damage.spec.ts:143:3
 
 # Error details
 
@@ -18,7 +18,7 @@ Test timeout of 30000ms exceeded.
 ```
 Error: locator.click: Test timeout of 30000ms exceeded.
 Call log:
-  - waiting for locator('.btn-primary')
+  - waiting for locator('.btn-secondary')
 
 ```
 
@@ -51,49 +51,6 @@ Call log:
 # Test source
 
 ```ts
-  28  |     // 点击游戏区域以获得焦点
-  29  |     await page.click('.game-room')
-  30  |     await page.waitForTimeout(500)
-  31  |   })
-  32  | 
-  33  |   test('玩家死亡后显示死亡界面', async ({ page }) => {
-  34  |     // 使用当前环境中能够访问的API
-  35  | 
-  36  |     // 直接通过evaluate调用方法
-  37  |     await page.evaluate(() => {
-  38  |       // 创建游戏存储的接口（避免usGameStore不存在问题）
-  39  |       if (!window.__gameStore) {
-  40  |         window.__gameStore = {
-  41  |           health: 100,
-  42  |           gameState: 'playing',
-  43  |           takeDamage(amount: number) {
-  44  |             this.health = Math.max(0, this.health - amount)
-  45  |             if (this.health <= 0) {
-  46  |               this.gameState = 'ended'
-  47  |             }
-  48  |           }
-  49  |         }
-  50  |       }
-  51  |       // 让玩家死亡
-  52  |       for (let i = 0; i < 10; i++) {
-  53  |         window.__gameStore.takeDamage(15)
-  54  |       }
-  55  |     })
-  56  | 
-  57  |     // 等待死亡界面出现
-  58  |     await page.waitForTimeout(300)
-  59  | 
-  60  |     // 检查死亡界面是否显示
-  61  |     const deathScreen = page.locator('.death-screen')
-  62  |     await expect(deathScreen).toBeVisible()
-  63  |   })
-  64  | 
-  65  |   test('死亡界面显示统计信息', async ({ page }) => {
-  66  |     // 创建游戏角色存储
-  67  |     await page.evaluate(() => {
-  68  |       if (!window.__gameStore) {
-  69  |         window.__gameStore = {
-  70  |           health: 100,
   71  |           gameState: 'playing',
   72  |           score: 0,
   73  |           kills: 0,
@@ -151,8 +108,7 @@ Call log:
   125 | 
   126 |     // 点击重新开始按钮
   127 |     const restartButton = page.locator('.btn-primary')
-> 128 |     await restartButton.click()
-      |                         ^ Error: locator.click: Test timeout of 30000ms exceeded.
+  128 |     await restartButton.click()
   129 | 
   130 |     await page.waitForTimeout(500)
   131 | 
@@ -167,42 +123,6 @@ Call log:
   140 |     expect(health).toBe(100)
   141 |   })
   142 | 
-  143 |   test('点击返回主页按钮跳转', async ({ page }) => {
-  144 |     // 创建游戏角色存储
-  145 |     await page.evaluate(() => {
-  146 |       if (!window.__gameStore) {
-  147 |         window.__gameStore = {
-  148 |           health: 100,
-  149 |           gameState: 'playing',
-  150 |           score: 0,
-  151 |           kills: 0,
-  152 |           gameTime: 0,
-  153 |           takeDamage(amount: number) {
-  154 |             this.health = Math.max(0, this.health - amount)
-  155 |             if (this.health <= 0) {
-  156 |               this.gameState = 'ended'
-  157 |             }
-  158 |           }
-  159 |         }
-  160 |       }
-  161 |       // 让玩家死亡
-  162 |       for (let i = 0; i < 10; i++) {
-  163 |         window.__gameStore.takeDamage(15)
-  164 |       }
-  165 |     })
-  166 | 
-  167 |     await page.waitForTimeout(300)
-  168 | 
-  169 |     // 点击返回主页按钮
-  170 |     const homeButton = page.locator('.btn-secondary')
-  171 |     await homeButton.click()
-  172 | 
-  173 |     // 等待导航到主页 (加长一点等待时间)
-  174 |     await page.waitForTimeout(2000)
-  175 | 
-  176 |     // 检查是否回到主页 - 使用更稳定的查找方式
-  177 |     const homePageTitle = page.locator('h1', { hasText: '儿童游戏平台' })
-  178 |     await expect(homePageTitle).toBeVisible()
-  179 |   })
+  143 |  c
   180 | })
 ```

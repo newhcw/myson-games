@@ -169,4 +169,22 @@ export class GamePage {
     const match = healthText.match(/\d+/)
     return match ? parseInt(match[0], 10) : 100
   }
+
+  /**
+   * 获取所有血条元素
+   */
+  async getHealthBars() {
+    // 等待游戏加载完成
+    await this.expectLoaded()
+
+    // 通过测试API获取血条信息
+    return await this.page.evaluate(() => {
+      // @ts-ignore - 测试API仅在开发环境可用
+      const testApi = window.__testApi
+      if (testApi && testApi.getHealthBars) {
+        return testApi.getHealthBars()
+      }
+      return []
+    })
+  }
 }

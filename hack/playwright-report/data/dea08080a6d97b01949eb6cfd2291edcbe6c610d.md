@@ -6,16 +6,43 @@
 
 # Test info
 
-- Name: kids-game-platform\TC0028-enemy-damage.spec.ts >> 敌人伤害系统 >> 死亡界面显示统计信息
-- Location: tests\e2e\kids-game-platform\TC0028-enemy-damage.spec.ts:65:3
+- Name: kids-game-platform\TC0028-enemy-damage.spec.ts >> 敌人伤害系统 >> 点击重新开始按钮重置游戏
+- Location: tests\e2e\kids-game-platform\TC0028-enemy-damage.spec.ts:100:3
 
 # Error details
 
 ```
-TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
-Call log:
-  - waiting for locator('.game-room') to be visible
+Test timeout of 30000ms exceeded while running "beforeEach" hook.
+```
 
+```
+Error: page.waitForTimeout: Test timeout of 30000ms exceeded.
+```
+
+# Page snapshot
+
+```yaml
+- generic [ref=e3] [cursor=pointer]:
+  - generic:
+    - generic:
+      - generic:
+        - generic: 生命值
+      - generic:
+        - generic: "得分: 0"
+        - generic: "击杀: 0"
+    - generic:
+      - generic:
+        - generic: "1"
+        - generic: "2"
+        - generic: "3"
+        - generic: "4"
+        - generic: "5"
+      - generic:
+        - generic: 手枪
+        - generic: 12 / 48
+    - generic:
+      - paragraph: WASD 移动 | 鼠标控制视角 | 1-5/Q 切换武器 | R 换弹 | 右键倍镜
+  - button "退出游戏" [ref=e6]
 ```
 
 # Test source
@@ -46,12 +73,12 @@ Call log:
   23  |     await gameButton.click()
   24  | 
   25  |     // 等待游戏页面加载
-> 26  |     await page.waitForSelector('.game-room', { timeout: 15000 })
-      |                ^ TimeoutError: page.waitForSelector: Timeout 15000ms exceeded.
+  26  |     await page.waitForSelector('.game-room', { timeout: 15000 })
   27  | 
   28  |     // 点击游戏区域以获得焦点
   29  |     await page.click('.game-room')
-  30  |     await page.waitForTimeout(500)
+> 30  |     await page.waitForTimeout(500)
+      |                ^ Error: page.waitForTimeout: Test timeout of 30000ms exceeded.
   31  |   })
   32  | 
   33  |   test('玩家死亡后显示死亡界面', async ({ page }) => {
@@ -148,4 +175,8 @@ Call log:
   124 |     await page.waitForTimeout(300)
   125 | 
   126 |     // 点击重新开始按钮
+  127 |     const restartButton = page.locator('.btn-primary')
+  128 |     await restartButton.click()
+  129 | 
+  130 |     await page.waitForTimeout(500)
 ```

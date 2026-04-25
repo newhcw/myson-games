@@ -13,7 +13,7 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'chromium',
+      name: 'kids-game-platform',
       use: { ...devices['Desktop Chrome'] },
     },
   ],

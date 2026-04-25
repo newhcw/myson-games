@@ -15,7 +15,7 @@ test.describe('本地存储测试', () => {
     settingsPage = new SettingsPage(page)
     homePage = new HomePage(page)
     // 先清空本地存储以确保测试独立性
-    await page.goto('http://localhost:5173/')
+    await page.goto('http://localhost:3000/')
     await page.evaluate(() => localStorage.clear())
   })
 
@@ -66,7 +66,7 @@ test.describe('本地存储测试', () => {
     await homePage.expectLoaded()
 
     // 重新进入设置页面
-    await page.goto('http://localhost:5173/settings')
+    await page.goto('http://localhost:3000/settings')
     await settingsPage.expectLoaded()
 
     // 验证设置仍然存在（检查localStorage）
