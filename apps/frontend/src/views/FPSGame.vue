@@ -11,6 +11,8 @@ import { DEFAULT_WEAPONS } from '@/game/weapons/types'
 import { soundManager } from '@/game/sound/SoundManager'
 import { damageFeedback } from '@/game/ui/DamageFeedback'
 import DeathScreen from '@/game/ui/DeathScreen.vue'
+import { PlayerRocketManager } from '@/game/player-rocket/PlayerRocketManager'
+import { RpgExplosion } from '@/game/player-rocket/RpgExplosion'
 
 const router = useRouter()
 const isLoading = ref(true)
@@ -34,6 +36,18 @@ const keys = { w: false, a: false, s: false, d: false }
 // Shooting state
 const lastFireTime = ref(0)
 const isFiring = ref(false)
+
+// Rocket manager
+let rocketManager: PlayerRocketManager | null = null
+
+// Camera shake for RPG effect
+const cameraShake = ref({
+  active: false,
+  startTime: 0,
+  duration: 0.1,
+  intensity: 0.03,
+  originalPositions: [] as number[],
+})
 
 // Mouse look
 let yaw = 0
@@ -68,14 +82,27 @@ const onSceneReady = (
   camera = cameraObj
   renderer = rendererObj
 
+  // 初始化火箭管理器
+  rocketManager = new PlayerRocketManager()
+  rocketManager.setScene(sceneObj)
+  rocketManager.setOnExplosion((pos) => {
+    handleRocketExplosion(pos)
+  })
+  // 设置敌人位置提供器：火箭飞行时检测敌人接近
+  rocketManager.setEnemyProvider(() => {
+    if (!enemyManagerRef.value) return []
+    const enemies = enemyManagerRef.value.getActiveEnemies() || []
+    return enemies.map((e: any) => ({ position: e.position, isDead: e.isDead }))
+  })
+
   // Add some obstacles
   createObstacles()
 
   isLoading.value = false
 }
 
-// 敌人管理器引用
-let enemyManagerRef: any = null
+// 敌人管理器引用（使用 ref 以便模板 ref 自动绑定）
+const enemyManagerRef = ref<any>(null)
 
 // 处理玩家被击中
 const onPlayerHit = (damage: number) => {
@@ -130,12 +157,13 @@ const handleKeyDown = (e: KeyboardEvent) => {
     case 'a': keys.a = true; break
     case 's': keys.s = true; break
     case 'd': keys.d = true; break
-    // Weapon switching (1-5)
+    // Weapon switching (1-6)
     case '1': weaponStore.switchWeapon(0); break
     case '2': weaponStore.switchWeapon(1); break
     case '3': weaponStore.switchWeapon(2); break
     case '4': weaponStore.switchWeapon(3); break
     case '5': weaponStore.switchWeapon(4); break
+    case '6': weaponStore.switchWeapon(5); break
     // Cycle weapon (Q)
     case 'q': weaponStore.cycleWeapon(); break
     // Reload (R)
@@ -229,13 +257,198 @@ const fire = () => {
   // Attempt to fire (checks ammo and reload state)
   const fired = weaponStore.fire()
   if (fired) {
-    // Perform raycast to check for enemy hits
-    performRaycast()
+    // RPG 武器：发射火箭弹道
+    if (weapon.type === 'rpg') {
+      fireRocket()
+      // 屏幕震动效果
+      startCameraShake(0.1, 0.03)
+    } else {
+      // Perform raycast to check for enemy hits
+      performRaycast()
+    }
     // Play fire sound
     soundManager.playShoot()
   } else {
     // Play empty click if no ammo
     soundManager.playEmpty()
+  }
+}
+
+// RPG 火箭发射
+const fireRocket = () => {
+  if (!camera || !scene || !rocketManager) return
+
+  // 获取发射方向（相机朝向）
+  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
+  const origin = camera.position.clone()
+
+  // 略微抬高发射起点（火箭从胸口位置发射）
+  origin.y -= 0.1
+
+  rocketManager.spawn({
+    origin,
+    direction,
+    speed: 650,
+  })
+}
+
+// 屏幕震动效果
+const startCameraShake = (duration = 0.1, intensity = 0.03) => {
+  if (!camera) return
+  cameraShake.value = {
+    active: true,
+    startTime: Date.now(),
+    duration,
+    intensity,
+    originalPositions: [camera.position.x, camera.position.y, camera.position.z],
+  }
+}
+
+// 游戏循环中更新相机震动位置
+const updateCameraForShake = () => {
+  if (!camera || !cameraShake.value.active) return false
+
+  const now = Date.now()
+  const shake = cameraShake.value
+  const elapsed = (now - shake.startTime) / 1000
+
+  if (elapsed >= shake.duration) {
+    cameraShake.value.active = false
+    camera.position.set(
+      shake.originalPositions[0],
+      shake.originalPositions[1],
+      shake.originalPositions[2]
+    )
+    return false
+  }
+
+  const progress = elapsed / shake.duration
+  // 震动强度随时间减弱
+  const currentIntensity = shake.intensity * (1 - progress)
+  // 生成随机偏移
+  const offsetX = (Math.random() - 0.5) * 2 * currentIntensity
+  const offsetY = (Math.random() - 0.5) * 2 * currentIntensity * 0.5 // 垂直偏移较小
+
+  camera.position.set(
+    shake.originalPositions[0] + offsetX,
+    shake.originalPositions[1] + offsetY,
+    shake.originalPositions[2]
+  )
+
+  return true
+}
+
+// RPG 爆炸特效文字（BOOM!）
+const showRpgBoomEffect = (position: THREE.Vector3) => {
+  if (!camera) return
+
+  const vector = position.clone().project(camera)
+  const x = (vector.x * 0.5 + 0.5) * window.innerWidth
+  const y = (-vector.y * 0.5 + 0.5) * window.innerHeight
+
+  const boom = document.createElement('div')
+  boom.textContent = 'BOOM!'
+  boom.style.cssText = `
+    position: absolute;
+    left: ${x}px;
+    top: ${y}px;
+    transform: translate(-50%, -50%);
+    font-size: 48px;
+    font-weight: bold;
+    color: #FF4444;
+    text-shadow: 3px 3px 6px rgba(0,0,0,0.8), 0 0 30px rgba(255,68,68,0.8);
+    z-index: 1002;
+    pointer-events: none;
+    font-family: Arial, sans-serif;
+    animation: boomEffect 1s ease-out forwards;
+  `
+
+  if (!document.getElementById('boom-animation')) {
+    const style = document.createElement('style')
+    style.id = 'boom-animation'
+    style.textContent = `
+      @keyframes boomEffect {
+        0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(-10deg); }
+        20% { opacity: 1; transform: translate(-50%, -50%) scale(1.5) rotate(5deg); }
+        40% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
+        100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8) translateY(-50px); }
+      }
+    `
+    document.head.appendChild(style)
+  }
+
+  const container = document.getElementById('game-ui') || document.body
+  container.appendChild(boom)
+
+  setTimeout(() => boom.remove(), 1000)
+}
+
+// 诊断：最近一次 RPG 爆炸信息
+let lastRpgExplosion: { x: number; z: number; enemiesInRange: number; totalEnemies: number } | null = null
+
+// RPG 火箭爆炸处理（AOE 伤害 + 弹飞效果）
+const handleRocketExplosion = (position: THREE.Vector3) => {
+  if (!enemyManagerRef.value || !scene) {
+    console.warn('handleRocketExplosion: enemyManagerRef or scene is null', !!enemyManagerRef.value, !!scene)
+    return
+  }
+
+  // 显示RPG爆炸特效
+  showRpgBoomEffect(position)
+
+  const radius = 20
+  const maxDamage = 150
+  const minDamage = 50
+
+  // 获取所有活跃敌人
+  const enemies = enemyManagerRef.value.getActiveEnemies() || []
+  let enemiesInRange = 0
+
+  for (const enemy of enemies) {
+    if (enemy.isDead) continue
+
+    // 计算敌人与爆炸中心的距离（xz 平面）
+    const dx = enemy.position.x - position.x
+    const dz = enemy.position.z - position.z
+    const dist = Math.sqrt(dx * dx + dz * dz)
+
+    if (dist <= radius) {
+      enemiesInRange++
+      // 线性衰减伤害
+      const damage = Math.round(maxDamage - (dist / radius) * (maxDamage - minDamage))
+      const finalDamage = Math.max(minDamage, Math.min(maxDamage, damage))
+
+      // 应用伤害
+      enemyManagerRef.value?.onEnemyHit(enemy.id, finalDamage)
+
+      // 弹飞效果
+      if (enemy.mesh) {
+        // 爆炸后稍延迟弹飞（让爆炸特效先出现）
+        setTimeout(() => {
+          if (enemy.mesh) {
+            RpgExplosion.createKnockback(enemy.mesh, enemy.isDead)
+          }
+        }, 50)
+      }
+    } else if (enemy.mesh) {
+      // 范围外但靠近的敌人也轻微弹飞（纯视觉效果）
+      const knockDist = radius + 1
+      if (dist <= knockDist && !enemy.isDead) {
+        setTimeout(() => {
+          if (enemy.mesh) {
+            RpgExplosion.createKnockback(enemy.mesh, false)
+          }
+        }, 80)
+      }
+    }
+  }
+
+  // 记录诊断信息
+  lastRpgExplosion = {
+    x: position.x,
+    z: position.z,
+    enemiesInRange,
+    totalEnemies: enemies.length,
   }
 }
 
@@ -248,7 +461,7 @@ const performRaycast = () => {
 
   // 检测场景中的敌人
   const enemyGroup = scene.getObjectByName('enemies')
-  if (enemyGroup && enemyManagerRef) {
+  if (enemyGroup && enemyManagerRef.value) {
     const intersects = raycaster.intersectObjects(enemyGroup.children, true)
 
     // 找到第一个命中的敌人
@@ -261,10 +474,10 @@ const performRaycast = () => {
 
       if (object && object.userData) {
         // 检查是否是敌人
-        const enemy = enemyManagerRef.getActiveEnemies().find((e: any) => e.mesh === object)
+        const enemy = enemyManagerRef.value?.getActiveEnemies().find((e: any) => e.mesh === object)
         if (enemy && !enemy.isDead) {
           const damage = weaponStore.currentWeapon?.damage || 10
-          enemyManagerRef.onEnemyHit(enemy.id, damage)
+          enemyManagerRef.value?.onEnemyHit(enemy.id, damage)
 
           // 播放击中特效
           createHitEffect(intersect.point)
@@ -380,8 +593,18 @@ const gameLoop = () => {
   updateAutoFire(delta)
 
   // 更新敌人管理器
-  if (enemyManagerRef) {
-    enemyManagerRef.update(delta)
+  if (enemyManagerRef.value) {
+    enemyManagerRef.value?.update(delta)
+  }
+
+  // 更新火箭管理器
+  if (rocketManager) {
+    rocketManager.update(delta, playerPosition)
+  }
+
+  // 更新屏幕震动
+  if (cameraShake.value.active) {
+    updateCameraForShake()
   }
 
   // Update scope FOV
@@ -456,6 +679,7 @@ onMounted(() => {
 
   // Start game loop after a brief delay to ensure scene is loaded
   setTimeout(() => {
+    lastTime = performance.now() // 重置时间基准，避免首帧 delta 过大
     gameLoop()
   }, 500)
 })
@@ -475,6 +699,9 @@ onUnmounted(() => {
   if (renderer) {
     renderer.dispose()
   }
+
+  // 清理火箭管理器
+  rocketManager?.clear()
 })
 
 
@@ -489,45 +716,45 @@ onMounted(() => {
   window.__testApi = {
     // 获取所有活跃敌人
     getEnemies: () => {
-      if (!enemyManagerRef) return []
-      return enemyManagerRef.getActiveEnemies() || []
+      if (!enemyManagerRef.value) return []
+      return enemyManagerRef.value.getActiveEnemies() || []
     },
 
     // 射击指定索引敌人
     shootEnemy: (index: number) => {
-      if (!enemyManagerRef) return false
-      const enemies = enemyManagerRef.getActiveEnemies()
+      if (!enemyManagerRef.value) return false
+      const enemies = enemyManagerRef.value.getActiveEnemies()
       const enemy = enemies[index]
       if (!enemy) return false
 
       // 造成大量伤害，直接击杀
-      enemyManagerRef.onEnemyHit(enemy.id, 999)
+      enemyManagerRef.value.onEnemyHit(enemy.id, 999)
       return true
     },
 
     // 手动触发敌人受伤效果
     hitEnemy: (index: number, damage: number = 10) => {
-      if (!enemyManagerRef) return false
-      const enemies = enemyManagerRef.getActiveEnemies()
+      if (!enemyManagerRef.value) return false
+      const enemies = enemyManagerRef.value.getActiveEnemies()
       const enemy = enemies[index]
       if (!enemy) return false
 
-      enemyManagerRef.onEnemyHit(enemy.id, damage)
+      enemyManagerRef.value.onEnemyHit(enemy.id, damage)
       return true
     },
 
     // 获取血条数量（通过 EnemyAI）
     getHealthBars: () => {
-      if (!enemyManagerRef) return []
-      const count = enemyManagerRef.getHealthBarCount()
+      if (!enemyManagerRef.value) return []
+      const count = enemyManagerRef.value.getHealthBarCount()
       // 返回虚拟数组以兼容现有测试
       return Array.from({ length: count }, (_, i) => ({ index: i }))
     },
 
     // 将玩家传送到指定敌人前方（确保敌人能看到玩家）
     movePlayerToEnemy: (index: number) => {
-      if (!enemyManagerRef) return false
-      const enemies = enemyManagerRef.getActiveEnemies()
+      if (!enemyManagerRef.value) return false
+      const enemies = enemyManagerRef.value.getActiveEnemies()
       const enemy = enemies[index]
       if (!enemy || !enemy.position) return false
 
@@ -569,14 +796,14 @@ onMounted(() => {
 
     // 获取活跃子弹数量
     getActiveProjectileCount: () => {
-      if (!enemyManagerRef) return 0
-      return enemyManagerRef.getActiveProjectileCount?.() || 0
+      if (!enemyManagerRef.value) return 0
+      return enemyManagerRef.value.getActiveProjectileCount?.() || 0
     },
 
     // 获取敌人蓄力状态
     getEnemyChargeState: (index: number) => {
-      if (!enemyManagerRef) return null
-      const enemies = enemyManagerRef.getActiveEnemies()
+      if (!enemyManagerRef.value) return null
+      const enemies = enemyManagerRef.value.getActiveEnemies()
       const enemy = enemies[index]
       if (!enemy) return null
       return {
@@ -587,8 +814,8 @@ onMounted(() => {
 
     // 将玩家移动到指定索引敌人正面（别名，兼容旧调用）
     movePlayerToEnemyFront: (index: number) => {
-      if (!enemyManagerRef) return false
-      const enemies = enemyManagerRef.getActiveEnemies()
+      if (!enemyManagerRef.value) return false
+      const enemies = enemyManagerRef.value.getActiveEnemies()
       const enemy = enemies[index]
       if (!enemy || !enemy.position) return false
       if (enemy.mesh) {
@@ -604,8 +831,8 @@ onMounted(() => {
 
     // 获取敌人类型
     getEnemyType: (index: number) => {
-      if (!enemyManagerRef) return null
-      const enemies = enemyManagerRef.getActiveEnemies()
+      if (!enemyManagerRef.value) return null
+      const enemies = enemyManagerRef.value.getActiveEnemies()
       const enemy = enemies[index]
       if (!enemy || !enemy.config) return null
       return enemy.config.type
@@ -613,8 +840,8 @@ onMounted(() => {
 
     // 强制所有敌人面向玩家（用于测试，确保敌人能发现并攻击玩家）
     forceEnemiesToFacePlayer: () => {
-      if (!enemyManagerRef) return false
-      const enemies = enemyManagerRef.getActiveEnemies()
+      if (!enemyManagerRef.value) return false
+      const enemies = enemyManagerRef.value.getActiveEnemies()
       enemies.forEach((enemy: any) => {
         if (enemy.mesh && !enemy.isDead) {
           enemy.mesh.lookAt(playerPosition.x, enemy.mesh.position.y, playerPosition.z)
@@ -625,7 +852,105 @@ onMounted(() => {
         }
       })
       return true
-    }
+    },
+
+    // ===== RPG 武器测试 API =====
+
+    // 切换到 RPG 武器（索引 5）
+    switchToRpg: () => {
+      weaponStore.switchWeapon(5)
+      return true
+    },
+
+    // 获取当前武器类型
+    getCurrentWeaponType: () => {
+      return weaponStore.currentWeapon?.type || null
+    },
+
+    // 获取 RPG 弹药状态
+    getRpgAmmo: () => {
+      const ammoData = weaponStore.ammo.get('rpg')
+      if (!ammoData) return null
+      return { current: ammoData.current, reserve: ammoData.reserve }
+    },
+
+    // 获取活跃火箭数量
+    getActiveRocketCount: () => {
+      return rocketManager?.getActiveRockets().length || 0
+    },
+
+    // 手动触发火箭爆炸（用于测试 AOE 效果）
+    triggerRpgExplosion: (x: number, z: number) => {
+      if (!scene) return false
+      handleRocketExplosion(new THREE.Vector3(x, 0, z))
+      return true
+    },
+
+    // 实际发射 RPG 火箭（消耗弹药并调用 fireRocket）
+    fireRpgMissile: () => {
+      if (!camera || !rocketManager) return false
+      const fired = weaponStore.fire()
+      if (!fired) return false
+      fireRocket()
+      return true
+    },
+
+    // 朝指定目标坐标发射火箭（直接计算方向，不依赖相机朝向）
+    fireRpgToward: (x: number, z: number) => {
+      if (!camera || !rocketManager) return false
+      const fired = weaponStore.fire()
+      if (!fired) return false
+      const origin = camera.position.clone()
+      origin.y -= 0.1
+      const dx = x - origin.x
+      const dz = z - origin.z
+      const direction = new THREE.Vector3(dx, 0, dz).normalize()
+      rocketManager.spawn({ origin, direction, speed: 650 })
+      return true
+    },
+
+    // 设置相机朝向（让相机看向指定世界坐标）
+    lookAtTarget: (x: number, z: number) => {
+      if (!camera) return false
+      const dx = x - camera.position.x
+      const dz = z - camera.position.z
+      // 使用 setFromUnitVectors 从默认前方向量(0,0,-1)旋转到目标方向
+      const targetDir = new THREE.Vector3(dx, 0, dz).normalize()
+      const defaultForward = new THREE.Vector3(0, 0, -1)
+      const quat = new THREE.Quaternion().setFromUnitVectors(defaultForward, targetDir)
+      camera.quaternion.copy(quat)
+      // 同步 yaw
+      yaw = Math.atan2(targetDir.x, -targetDir.z)
+      return true
+    },
+
+    // 获取玩家位置
+    getPlayerPosition: () => {
+      return { x: playerPosition.x, y: playerPosition.y, z: playerPosition.z }
+    },
+
+    // 等待火箭爆炸完成（轮询直到所有火箭消失或超时）
+    waitForRocketExplosion: (timeoutMs: number = 5000) => {
+      return new Promise((resolve) => {
+        const startTime = Date.now()
+        const check = () => {
+          const rockets = rocketManager?.getActiveRockets() || []
+          if (rockets.length === 0 || Date.now() - startTime >= timeoutMs) {
+            const enemies = enemyManagerRef.value?.getActiveEnemies() || []
+            resolve({
+              exploded: rockets.length === 0,
+              remainingEnemies: enemies.length,
+              elapsed: Date.now() - startTime,
+              // 包含爆炸诊断信息
+              explosion: lastRpgExplosion ? { ...lastRpgExplosion } : null,
+            })
+            return
+          }
+          requestAnimationFrame(check)
+        }
+        requestAnimationFrame(check)
+      })
+    },
   }
 })
 
@@ -716,7 +1041,7 @@ onMounted(() => {
       </div>
 
       <div class="controls-hint">
-        <p>WASD 移动 | 鼠标控制视角 | 1-5/Q 切换武器 | R 换弹 | 右键倍镜</p>
+        <p>WASD 移动 | 鼠标控制视角 | 1-6/Q 切换武器 | R 换弹 | 右键倍镜</p>
       </div>
     </div>
 

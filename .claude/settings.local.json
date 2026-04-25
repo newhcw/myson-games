@@ -15,7 +15,10 @@
       "Bash(python3 *)",
       "Bash(xargs kill *)",
       "Bash(mkdir -p openspec/changes/archive)",
-      "Bash(mv openspec/changes/enemy-projectile-attack openspec/changes/archive/2026-04-25-enemy-projectile-attack)"
+      "Bash(mv openspec/changes/enemy-projectile-attack openspec/changes/archive/2026-04-25-enemy-projectile-attack)",
+      "Bash(playwright test *)",
+      "Bash(pkill -f playwright)",
+      "Bash(tee /tmp/test-output.txt)"
     ]
   }
 }

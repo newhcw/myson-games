@@ -107,7 +107,7 @@ pnpm test:debug        # 调试模式
 pnpm report            # 查看 HTML 报告
 ```
 测试文件命名规范：`TC{NNNN}*.spec.ts`（如 `TC0001-login.spec.ts`），放在 `hack/tests/e2e/` 对应模块目录下。
-
+E2E测试目录：`hack`
 
 # 开发流程规范
 

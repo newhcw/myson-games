@@ -190,7 +190,8 @@ export class GamePage {
   async getHealthBars() {
     await this.expectLoaded()
     return await this.page.evaluate(() => {
-      const testApi = (window as any).__testApi
+      // @ts-ignore - 测试API仅在开发环境可用
+      const testApi = window.__testApi
       if (testApi && testApi.getHealthBars) {
         return testApi.getHealthBars()
       }

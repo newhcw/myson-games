@@ -111,8 +111,8 @@ export class EnemyHealthBar {
       this.healthBars.set(enemy.id, healthBar)
     }
 
-    // 只在非满血且非死亡时显示血条
-    const shouldShow = enemy.health < enemy.maxHealth && !enemy.isDead
+    // 只要没死就显示血条（包括满血状态，方便儿童玩家了解敌人状态）
+    const shouldShow = !enemy.isDead
 
     if (shouldShow) {
       // 根据敌人体型计算头顶偏移量

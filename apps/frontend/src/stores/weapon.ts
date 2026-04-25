@@ -16,6 +16,7 @@ export const useWeaponStore = defineStore('weapon', () => {
     ['rifle', { current: 30, reserve: 90, maxReserve: 180 }],
     ['sniper', { current: 5, reserve: 15, maxReserve: 30 }],
     ['shotgun', { current: 6, reserve: 24, maxReserve: 48 }],
+    ['rpg', { current: 1, reserve: 6, maxReserve: 18 }],
   ]))
 
   // Scope state

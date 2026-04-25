@@ -1,7 +1,7 @@
 export interface WeaponData {
   id: string
   name: string
-  type: 'pistol' | 'smg' | 'rifle' | 'sniper' | 'shotgun'
+  type: 'pistol' | 'smg' | 'rifle' | 'sniper' | 'shotgun' | 'rpg'
   damage: number
   fireRate: number // shots per second
   magazineSize: number
@@ -82,6 +82,19 @@ export const DEFAULT_WEAPONS: WeaponData[] = [
     scope: false,
     scopeMultiplier: 1,
     description: '范围伤害，近战之王',
+    isAuto: false,
+  },
+  {
+    id: 'rpg',
+    name: '火箭筒',
+    type: 'rpg',
+    damage: 150,
+    fireRate: 0.5,
+    magazineSize: 1,
+    reloadTime: 3000,
+    scope: false,
+    scopeMultiplier: 1,
+    description: '发射火箭，范围爆炸',
     isAuto: false,
   },
 ]

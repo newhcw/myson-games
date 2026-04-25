@@ -60,6 +60,12 @@ export class EnemyAI {
     }
 
     this.enemies.set(enemy.id, enemy)
+
+    // 立即初始化血条（避免懒加载导致的显示延迟）
+    if (this.healthBar) {
+      this.healthBar.update(enemy)
+    }
+
     return enemy
   }
 
