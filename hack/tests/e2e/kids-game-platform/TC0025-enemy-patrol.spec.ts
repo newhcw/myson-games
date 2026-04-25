@@ -29,6 +29,10 @@ test.describe('敌人巡逻系统测试', () => {
     expect(enemy).toBeDefined()
     expect(enemy.id).toBeDefined()
     expect(enemy.state).toBeDefined()
+
+    // 确保敌人有正确的巡逻路径点
+    expect(enemy.waypoints).toBeDefined()
+    expect(enemy.waypoints.length).toBeGreaterThan(0)
   });
 
   test('TC0029 - 敌人应能正确在路径点间移动', async ({ page }) => {
