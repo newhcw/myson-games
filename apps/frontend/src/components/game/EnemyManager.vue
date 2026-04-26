@@ -140,6 +140,13 @@ onUnmounted(() => {
 defineExpose({
   update,
   onEnemyHit,
+  reset: () => {
+    enemyAI.clear()
+    projectileManager?.clear()
+    enemies = []
+    enemySpawnData.clear()
+    spawnInitialEnemies()
+  },
   getActiveEnemies: () => enemyAI.getActiveEnemies(),
   getHealthBarCount: () => enemyAI.getHealthBarCount(),
   getProjectileManager: () => projectileManager,

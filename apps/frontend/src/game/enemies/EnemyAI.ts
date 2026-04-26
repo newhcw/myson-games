@@ -190,14 +190,16 @@ export class EnemyAI {
         }
       }
 
-      // 更新血条
-      if (this.healthBar) {
-        this.healthBar.update(enemy)
-      }
-
       // 更新BOSS粒子特效
       updateBossEffects(enemy, time)
     })
+
+    // 批量更新所有敌人的血条（带重叠检测）
+    if (this.healthBar) {
+      const allEnemies: Enemy[] = []
+      this.enemies.forEach(e => allEnemies.push(e))
+      this.healthBar.updateAll(allEnemies)
+    }
   }
 
   // 更新敌人状态

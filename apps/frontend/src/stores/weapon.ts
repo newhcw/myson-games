@@ -104,6 +104,24 @@ export const useWeaponStore = defineStore('weapon', () => {
     currentScope.value.magnification = scope.magnification
   }
 
+  // 重置所有武器弹药到初始值（用于游戏重新开始）
+  const resetAmmo = () => {
+    ammo.value = new Map([
+      ['pistol', { current: 12, reserve: 48, maxReserve: 120 }],
+      ['smg', { current: 50, reserve: 150, maxReserve: 300 }],
+      ['rifle', { current: 30, reserve: 90, maxReserve: 180 }],
+      ['sniper', { current: 5, reserve: 15, maxReserve: 30 }],
+      ['shotgun', { current: 6, reserve: 24, maxReserve: 48 }],
+      ['rpg', { current: 1, reserve: 6, maxReserve: 18 }],
+    ])
+    isReloading.value = false
+    currentScope.value = {
+      isActive: false,
+      magnification: 1,
+      originalFov: 75,
+    }
+  }
+
   return {
     weapons,
     currentWeaponIndex,
@@ -118,5 +136,6 @@ export const useWeaponStore = defineStore('weapon', () => {
     reload,
     toggleScope,
     setScope,
+    resetAmmo,
   }
 })

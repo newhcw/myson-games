@@ -124,26 +124,65 @@ const onEnemyKilled = (_enemyId: string, score: number) => {
 const createObstacles = () => {
   if (!scene) return
 
-  // Create some boxes as obstacles
-  const boxGeometry = new THREE.BoxGeometry(2, 2, 2)
-  const boxMaterial = new THREE.MeshStandardMaterial({ color: 0x8B4513 })
+  // 障碍物预设：类型、位置、尺寸、颜色
+  const obstaclePresets = [
+    // 大型障碍物（建筑/墙壁）
+    { type: 'box', size: [4, 3, 1], pos: [-12, 1.5, -8], color: 0x8B7355, castShadow: true },
+    { type: 'box', size: [1, 3, 4], pos: [12, 1.5, -6], color: 0x8B7355, castShadow: true },
+    { type: 'box', size: [6, 2, 1], pos: [0, 1, -15], color: 0x6B8E23, castShadow: true },
 
-  const positions = [
-    { x: -5, z: -5 },
-    { x: 5, z: -8 },
-    { x: -8, z: 3 },
-    { x: 8, z: 5 },
-    { x: 0, z: -12 },
+    // 中型立方体
+    { type: 'box', size: [2, 2, 2], pos: [-5, 1, -5], color: 0x8B4513, castShadow: true },
+    { type: 'box', size: [2, 2, 2], pos: [5, 1, -8], color: 0xA0522D, castShadow: true },
+    { type: 'box', size: [2, 2, 2], pos: [-8, 1, 3], color: 0x8B4513, castShadow: true },
+    { type: 'box', size: [2, 2, 2], pos: [8, 1, 5], color: 0xA0522D, castShadow: true },
+    { type: 'box', size: [2, 2, 2], pos: [0, 1, -12], color: 0xCD853F, castShadow: true },
+
+    // 低矮障碍物（掩体）
+    { type: 'box', size: [3, 1, 1.5], pos: [-3, 0.5, 0], color: 0x708090, castShadow: true },
+    { type: 'box', size: [3, 1, 1.5], pos: [3, 0.5, 2], color: 0x708090, castShadow: true },
+    { type: 'box', size: [1.5, 1, 3], pos: [0, 0.5, 5], color: 0x778899, castShadow: true },
+
+    // 圆柱形障碍物
+    { type: 'cylinder', size: [0.8, 0.8, 3, 16], pos: [-10, 1.5, 0], color: 0x4682B4, castShadow: true },
+    { type: 'cylinder', size: [0.8, 0.8, 3, 16], pos: [10, 1.5, -2], color: 0x4682B4, castShadow: true },
+    { type: 'cylinder', size: [1.2, 1.2, 2, 16], pos: [15, 1, 8], color: 0x5F9EA0, castShadow: true },
+
+    // 小型装饰物
+    { type: 'box', size: [1, 1, 1], pos: [-15, 0.5, 5], color: 0xDEB887, castShadow: true },
+    { type: 'box', size: [1, 1, 1], pos: [15, 0.5, -10], color: 0xDEB887, castShadow: true },
+    { type: 'box', size: [1.5, 0.5, 1.5], pos: [-6, 0.25, 8], color: 0x2E8B57, castShadow: false },
+    { type: 'box', size: [1.5, 0.5, 1.5], pos: [7, 0.25, -15], color: 0x2E8B57, castShadow: false },
+
+    // 中央区域障碍物
+    { type: 'box', size: [2, 1.5, 2], pos: [-2, 0.75, -3], color: 0xB8860B, castShadow: true },
+    { type: 'box', size: [2, 1.5, 2], pos: [2, 0.75, -4], color: 0xB8860B, castShadow: true },
   ]
 
-  positions.forEach((pos) => {
-    const box = new THREE.Mesh(boxGeometry, boxMaterial)
-    box.position.set(pos.x, 1, pos.z)
-    box.castShadow = true
-    box.receiveShadow = true
-    scene!.add(box)
+  obstaclePresets.forEach((preset) => {
+    let geometry: THREE.BufferGeometry
+    if (preset.type === 'cylinder') {
+      const [rTop, rBottom, height, segments] = preset.size
+      geometry = new THREE.CylinderGeometry(rTop, rBottom, height, segments)
+    } else {
+      const [w, h, d] = preset.size
+      geometry = new THREE.BoxGeometry(w, h, d)
+    }
+
+    const material = new THREE.MeshStandardMaterial({
+      color: preset.color,
+      roughness: 0.8,
+      metalness: 0.1,
+    })
+
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.position.set(preset.pos[0], preset.pos[1], preset.pos[2])
+    mesh.castShadow = preset.castShadow ?? true
+    mesh.receiveShadow = true
+    scene!.add(mesh)
+
     // 添加碰撞体
-    collisionDetector.addCollider(box)
+    collisionDetector.addCollider(mesh)
   })
 }
 
@@ -589,29 +628,32 @@ const gameLoop = () => {
   const delta = (now - lastTime) / 1000
   lastTime = now
 
-  updateMovement(delta)
-  updateAutoFire(delta)
+  // 死亡时暂停所有游戏更新，只保持渲染
+  if (!gameStore.isDead) {
+    updateMovement(delta)
+    updateAutoFire(delta)
 
-  // 更新敌人管理器
-  if (enemyManagerRef.value) {
-    enemyManagerRef.value?.update(delta)
-  }
+    // 更新敌人管理器
+    if (enemyManagerRef.value) {
+      enemyManagerRef.value?.update(delta)
+    }
 
-  // 更新火箭管理器
-  if (rocketManager) {
-    rocketManager.update(delta, playerPosition)
-  }
+    // 更新火箭管理器
+    if (rocketManager) {
+      rocketManager.update(delta, playerPosition)
+    }
 
-  // 更新屏幕震动
-  if (cameraShake.value.active) {
-    updateCameraForShake()
-  }
+    // 更新屏幕震动
+    if (cameraShake.value.active) {
+      updateCameraForShake()
+    }
 
-  // Update scope FOV
-  if (camera && weaponStore.currentScope.isActive) {
-    const targetFov = weaponStore.currentScope.originalFov / weaponStore.currentScope.magnification
-    camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 0.1)
-    camera.updateProjectionMatrix()
+    // Update scope FOV
+    if (camera && weaponStore.currentScope.isActive) {
+      const targetFov = weaponStore.currentScope.originalFov / weaponStore.currentScope.magnification
+      camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 0.1)
+      camera.updateProjectionMatrix()
+    }
   }
 
   if (renderer && scene && camera) {
@@ -642,6 +684,14 @@ const onRestart = () => {
   if (camera) {
     camera.rotation.set(0, 0, 0)
   }
+  // 清理飞行中的火箭
+  rocketManager?.clear()
+  // 重置敌人系统（清理 + 重新生成）
+  enemyManagerRef.value?.reset()
+  // 重置所有武器弹药
+  weaponStore.resetAmmo()
+  // 重置时间基准，避免首帧 delta 过大
+  lastTime = performance.now()
 }
 
 const onGoHome = () => {
@@ -874,9 +924,22 @@ onMounted(() => {
       return { current: ammoData.current, reserve: ammoData.reserve }
     },
 
-    // 获取活跃火箭数量
-    getActiveRocketCount: () => {
-      return rocketManager?.getActiveRockets().length || 0
+    // 获取血条屏幕坐标（用于验证血条不重叠）
+    getHealthBarPositions: () => {
+      const bars: { id: string; x: number; y: number }[] = []
+      const container = document.getElementById('game-ui')
+      if (!container) return bars
+      const children = container.querySelectorAll('div[style*="position: absolute"]')
+      children.forEach((child) => {
+        const div = child as HTMLDivElement
+        if (div.style.display === 'none') return
+        const left = parseFloat(div.style.left)
+        const top = parseFloat(div.style.top)
+        if (!isNaN(left) && !isNaN(top)) {
+          bars.push({ id: div.textContent || '', x: left, y: top })
+        }
+      })
+      return bars
     },
 
     // 手动触发火箭爆炸（用于测试 AOE 效果）

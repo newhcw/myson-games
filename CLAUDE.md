@@ -91,7 +91,7 @@ openspec/            → OpenSpec相关文档
 ```bash
 # 在 frontend 目录下
 cd apps/frontend
-npm run dev      # 启动开发服务器
+npm run dev     # 启动开发服务器
 npm run build    # 构建生产版本
 npm run preview  # 预览生产构建
 ```
@@ -109,7 +109,7 @@ pnpm report            # 查看 HTML 报告
 测试文件命名规范：`TC{NNNN}*.spec.ts`（如 `TC0001-login.spec.ts`），放在 `hack/tests/e2e/` 对应模块目录下。
 E2E测试目录：`hack`
 
-# 开发流程规范
+#  开发流程规范
 
 本项目采用`SDD`驱动开发，使用`OpenSpec`工具辅助落地。变更记录存放在 `openspec/changes/` 目录下。每个变更包含：`proposal.md`（提案）、`design.md`（设计）、`specs/`（增量规范）、`tasks.md`（任务清单）。
 

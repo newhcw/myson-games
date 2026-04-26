@@ -101,6 +101,11 @@ export class EnemyHealthBar {
     }
   }
 
+  // 获取血条高度阈值（用于重叠检测）
+  private getBarHeight(enemy: Enemy): number {
+    return enemy.config.type === 'boss' ? 50 : enemy.config.type === 'elite' ? 40 : 35
+  }
+
   // 更新血条位置和状态
   update(enemy: Enemy) {
     if (!enemy.mesh) return
@@ -125,6 +130,7 @@ export class EnemyHealthBar {
 
       // 3D坐标转2D屏幕坐标
       const screenPosition = this.toScreenPosition(enemyTop)
+      healthBar.screenY = screenPosition.y
 
       // 检查是否在屏幕前方
       const isInFront = screenPosition.z > 0
@@ -162,6 +168,59 @@ export class EnemyHealthBar {
     } else {
       healthBar.wrapper.style.display = 'none'
       healthBar.visible = false
+    }
+  }
+
+  /** 批量更新所有敌人血条，带重叠检测 */
+  updateAll(enemies: Enemy[]) {
+    // 第一遍：先单独更新每个敌人（创建/更新 DOM，计算屏幕坐标）
+    for (const enemy of enemies) {
+      this.update(enemy)
+    }
+
+    // 第二遍：检测可见血条的重叠并垂直偏移
+    const visibleBars: { id: string; y: number; height: number; el: HealthBarElement }[] = []
+    for (const enemy of enemies) {
+      const bar = this.healthBars.get(enemy.id)
+      if (!bar || !bar.visible) continue
+      visibleBars.push({
+        id: enemy.id,
+        y: bar.screenY,
+        height: this.getBarHeight(enemy),
+        el: bar,
+      })
+    }
+
+    // 按 Y 坐标从上到下排序
+    visibleBars.sort((a, b) => a.y - b.y)
+
+    // 检测重叠并垂直偏移
+    // 血条使用 transform: translate(-50%, -50%)，所以底部 = y + height/2，顶部 = y - height/2
+    const margin = 5 // 额外间距
+    for (let i = 1; i < visibleBars.length; i++) {
+      const prev = visibleBars[i - 1]
+      const curr = visibleBars[i]
+      const prevBottom = prev.y + prev.height / 2 + margin
+      const currTop = curr.y - curr.height / 2
+
+      if (currTop < prevBottom) {
+        // 将当前血条下移到前一个血条底部以下
+        const offset = prevBottom - currTop
+        const newY = curr.y + offset
+        curr.el.wrapper.style.top = `${newY}px`
+        curr.y = newY // 更新缓存 Y 以便后续链式累积
+      }
+    }
+
+    // 边界保护：确保血条不超出屏幕底部
+    const bottomLimit = window.innerHeight - 10
+    for (const item of visibleBars) {
+      const bottom = item.y + item.height / 2
+      if (bottom > bottomLimit) {
+        const clampedY = bottomLimit - item.height / 2
+        item.el.wrapper.style.top = `${clampedY}px`
+        item.y = clampedY
+      }
     }
   }
 
@@ -214,4 +273,5 @@ interface HealthBarElement {
   healthText: HTMLDivElement
   typeLabel: HTMLDivElement
   visible: boolean
+  screenY: number   // 缓存屏幕 Y 坐标，用于重叠检测
 }

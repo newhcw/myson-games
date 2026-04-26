@@ -27,7 +27,42 @@ const initScene = () => {
 
   // Scene
   scene.value = new THREE.Scene()
-  scene.value.background = new THREE.Color(0x87CEEB) // Sky blue
+
+  // 渐变天空球
+  const vertexShader = `
+    varying vec3 vWorldPosition;
+    void main() {
+      vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+      vWorldPosition = worldPosition.xyz;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `
+  const fragmentShader = `
+    uniform vec3 topColor;
+    uniform vec3 bottomColor;
+    uniform float offset;
+    uniform float exponent;
+    varying vec3 vWorldPosition;
+    void main() {
+      float h = normalize(vWorldPosition + offset).y;
+      gl_FragColor = vec4(mix(bottomColor, topColor, max(pow(max(h, 0.0), exponent), 0.0)), 1.0);
+    }
+  `
+  const uniforms = {
+    topColor: { value: new THREE.Color(0x87CEEB) },
+    bottomColor: { value: new THREE.Color(0xE0F7FA) },
+    offset: { value: 33 },
+    exponent: { value: 0.6 },
+  }
+  const skyGeo = new THREE.SphereGeometry(400, 32, 15)
+  const skyMat = new THREE.ShaderMaterial({
+    vertexShader,
+    fragmentShader,
+    uniforms,
+    side: THREE.BackSide,
+  })
+  const sky = new THREE.Mesh(skyGeo, skyMat)
+  scene.value.add(sky)
 
   // Camera
   const aspect = containerRef.value.clientWidth / containerRef.value.clientHeight
@@ -72,16 +107,26 @@ const initScene = () => {
   directionalLight.shadow.mapSize.height = 2048
   scene.value.add(directionalLight)
 
-  // Ground
-  const groundGeometry = new THREE.PlaneGeometry(100, 100)
+  // Ground - 带有网格线的地面
+  const groundSize = 100
+  const groundGeometry = new THREE.PlaneGeometry(groundSize, groundSize)
   const groundMaterial = new THREE.MeshStandardMaterial({
-    color: 0x4CAF50,
-    roughness: 0.8,
+    color: 0x7CB342,
+    roughness: 0.9,
+    metalness: 0.1,
   })
   const ground = new THREE.Mesh(groundGeometry, groundMaterial)
   ground.rotation.x = -Math.PI / 2
   ground.receiveShadow = true
+  ground.name = 'ground'
   scene.value.add(ground)
+
+  // 添加网格辅助线到地面
+  const gridHelper = new THREE.GridHelper(groundSize, 50, 0x000000, 0x000000)
+  gridHelper.position.y = 0.01 // 略高于地面避免 z-fighting
+  ;(gridHelper.material as THREE.Material).transparent = true
+  ;(gridHelper.material as THREE.Material).opacity = 0.1
+  scene.value.add(gridHelper)
 
   // Emit ready event
   emit('scene-ready', scene.value, camera.value, renderer.value)
