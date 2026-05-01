@@ -11,6 +11,7 @@ import {
   type WeaponProgress,
   type GameProgress,
 } from '@/game/storage/StorageManager'
+import { DEFAULT_KEY_BINDINGS, type KeyBindingConfig } from '@/game/input/KeyBindings'
 
 export const useSettingsStore = defineStore('settings', () => {
   // 状态
@@ -21,6 +22,9 @@ export const useSettingsStore = defineStore('settings', () => {
 
   // 初始化
   const initialized = ref(false)
+
+  // 按键映射
+  const keyBindings = ref<KeyBindingConfig>({ ...DEFAULT_KEY_BINDINGS })
 
   // 计算属性
   const masterVolume = computed(() => settings.value.masterVolume)

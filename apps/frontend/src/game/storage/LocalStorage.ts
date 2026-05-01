@@ -13,6 +13,9 @@ export const STORAGE_KEYS = {
 
   // 游戏状态
   GAME_STATE: 'kidsgame_state',
+
+  // 游戏存档
+  SAVE: 'kidsgame_save',
 } as const
 
 /**

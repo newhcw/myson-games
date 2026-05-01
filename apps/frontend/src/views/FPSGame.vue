@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import * as THREE from 'three'
 import SceneView from '@/components/game/SceneView.vue'
 import EnemyManager from '@/components/game/EnemyManager.vue'
@@ -8,13 +8,26 @@ import { collisionDetector } from '@/game/utils/Collision'
 import { useWeaponStore } from '@/stores/weapon'
 import { useGameStore } from '@/stores/game'
 import { DEFAULT_WEAPONS } from '@/game/weapons/types'
+import { DEFAULT_KEY_BINDINGS, type KeyBindingConfig } from '@/game/input/KeyBindings'
 import { soundManager } from '@/game/sound/SoundManager'
 import { damageFeedback } from '@/game/ui/DamageFeedback'
 import DeathScreen from '@/game/ui/DeathScreen.vue'
 import { PlayerRocketManager } from '@/game/player-rocket/PlayerRocketManager'
 import { RpgExplosion } from '@/game/player-rocket/RpgExplosion'
+import { storageManager, type GameSaveData } from '@/game/storage/StorageManager'
+import { InputManager, type KeyMapping } from '@/game/input/InputManager'
+import { SwitchWeaponCommand, ReloadCommand, ToggleScopeCommand, JumpCommand, CrouchCommand } from '@/game/input/Command'
+import VirtualJoystick from '@/components/game/VirtualJoystick.vue'
+import VirtualButton from '@/components/game/VirtualButton.vue'
+import { WaveManager, WAVE_CONFIGS, SPAWN_POINTS, INTERMISSION_DURATION, TOTAL_WAVES } from '@/game/wave/WaveManager'
+import type { WaveState } from '@/game/wave/types'
+import { PowerUpManager } from '@/game/powerups/PowerUpManager'
+import { useBuffsStore } from '@/stores/buffs'
+import VictoryScreen from '@/game/ui/VictoryScreen.vue'
+import type { EnemyTypeKeyword } from '@/game/wave/types'
 
 const router = useRouter()
+const route = useRoute()
 const isLoading = ref(true)
 const containerRef = ref<HTMLDivElement | null>(null)
 
@@ -33,9 +46,152 @@ const playerPosition = new THREE.Vector3(0, 1.6, 0)
 const moveSpeed = 5
 const keys = { w: false, a: false, s: false, d: false }
 
+// Player actions state
+const isRunning = ref(false)
+const isCrouching = ref(false)
+const playerHeight = ref(1.6)
+const jumpVelocity = ref(0)
+const isJumping = ref(false)
+const gravity = -9.8
+
+// Input manager
+const inputManager = new InputManager()
+
+// Touch device detection
+const isTouchDevice = ref(false)
+// Virtual joystick state
+const virtualMove = { x: 0, y: 0 }
+
+// Virtual control handlers
+const onVirtualMove = (direction: { x: number; y: number }) => {
+  virtualMove.x = direction.x
+  virtualMove.y = direction.y
+
+  // Convert to keys (matching updateMovement logic)
+  keys.w = direction.y < -0.5
+  keys.s = direction.y > 0.5
+  keys.a = direction.x < -0.5
+  keys.d = direction.x > 0.5
+}
+
+const onVirtualStop = () => {
+  virtualMove.x = 0
+  virtualMove.y = 0
+  keys.w = false
+  keys.s = false
+  keys.a = false
+  keys.d = false
+}
+
+const onVirtualButtonPress = (type: string) => {
+  switch (type) {
+    case 'shoot':
+      isFiring.value = true
+      fire()
+      break
+    case 'jump':
+      if (!isJumping.value) {
+        isJumping.value = true
+        jumpVelocity.value = 5
+      }
+      break
+    case 'crouch':
+      isCrouching.value = !isCrouching.value
+      playerHeight.value = isCrouching.value ? 0.8 : 1.6
+      break
+    case 'reload':
+      weaponStore.reload()
+      break
+    case 'scope':
+      weaponStore.toggleScope()
+      break
+  }
+}
+
+const onVirtualButtonRelease = (type: string) => {
+  if (type === 'shoot') {
+    isFiring.value = false
+  }
+}
+
+// 触摸视角控制
+let lastTouchLookPosition: { x: number; y: number } | null = null
+
+const onTouchLookStart = (e: TouchEvent) => {
+  e.preventDefault()
+  const touch = e.touches[0]
+  lastTouchLookPosition = { x: touch.clientX, y: touch.clientY }
+}
+
+const onTouchLookMove = (e: TouchEvent) => {
+  e.preventDefault()
+  if (!lastTouchLookPosition || !camera) return
+
+  const touch = e.touches[0]
+  const dx = touch.clientX - lastTouchLookPosition.x
+  const dy = touch.clientY - lastTouchLookPosition.y
+
+  // 更新视角（类似鼠标移动）
+  const sensitivity = 0.005
+  yaw -= dx * sensitivity
+  pitch -= dy * sensitivity
+  pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch))
+
+  camera.rotation.order = 'YXZ'
+  camera.rotation.y = yaw
+  camera.rotation.x = pitch
+
+  lastTouchLookPosition = { x: touch.clientX, y: touch.clientY }
+}
+
+const onTouchLookEnd = (e: TouchEvent) => {
+  e.preventDefault()
+  lastTouchLookPosition = null
+}
+
 // Shooting state
 const lastFireTime = ref(0)
 const isFiring = ref(false)
+
+// Recoil state (camera shake from weapon fire)
+const recoilOffset = ref({ x: 0, y: 0 })
+const recoilIndex = ref(0) // Track consecutive shots for recoil pattern
+const lastFireTimeForRecoil = ref(0)
+
+// Spread state (bullet inaccuracy)
+const currentSpread = ref(0)
+const lastFireTimeForSpread = ref(0)
+
+// ===== 波次系统状态 =====
+let waveManager: WaveManager | null = null
+let powerUpManager: PowerUpManager | null = null
+const currentWave = ref(1)
+const waveState = ref<WaveState>('waving')
+const intermissionCountdown = ref(0)
+const showVictoryScreen = ref(false)
+
+// Buff store
+const buffsStore = useBuffsStore()
+
+// Wave HUD computed
+const waveProgressText = computed(() => `第 ${currentWave.value} / ${TOTAL_WAVES} 波`)
+const isBossWave = computed(() => WAVE_CONFIGS[currentWave.value - 1]?.isBossWave === true)
+
+// Buff HUD computed
+const activeBuffs = computed(() => buffsStore.getActiveBuffs)
+
+// Breath hold (hold breath for stability)
+const isHoldingBreath = ref(false)
+const breathStamina = ref(100) // 0-100
+const maxBreathStamina = 100
+const breathConsumptionRate = 20 // per second
+const breathRecoveryRate = 10 // per second
+const minStaminaToStart = 10 // Minimum stamina to start holding breath
+
+// Computed for breath bar style
+const breathBarStyle = computed(() => ({
+  width: breathStamina.value + '%',
+}))
 
 // Rocket manager
 let rocketManager: PlayerRocketManager | null = null
@@ -52,6 +208,17 @@ const cameraShake = ref({
 // Mouse look
 let yaw = 0
 let pitch = 0
+
+// View sway (aiming sway/breathing simulation)
+const swayOffset = ref({ x: 0, y: 0 })
+const swayTime = ref(0)
+const swayAmount = 0.003 // Base sway amount (in radians)
+const swaySpeed = 1.5 // Sway oscillation speed
+const aimingSwayMultiplier = 0.3 // Reduced sway when aiming down sights
+const breathingSway = ref({ x: 0, y: 0 })
+const breathingTime = ref(0)
+const breathingAmount = 0.002 // Breathing sway amount
+const breathingSpeed = 0.5 // Breathing cycle speed
 
 // Computed
 const currentWeaponName = computed(() => {
@@ -98,7 +265,118 @@ const onSceneReady = (
   // Add some obstacles
   createObstacles()
 
+  // ===== 初始化波次管理器 =====
+  waveManager = new WaveManager()
+  waveManager.setCallbacks({
+    onWaveStart: (waveNumber: number) => {
+      currentWave.value = waveNumber
+      waveState.value = 'waving'
+      intermissionCountdown.value = 0
+      console.log(`第 ${waveNumber} 波开始`)
+      // 生成敌人
+      spawnWaveEnemies(waveNumber)
+    },
+    onWaveClear: (waveNumber: number) => {
+      waveState.value = 'intermission'
+      intermissionCountdown.value = INTERMISSION_DURATION
+      console.log(`第 ${waveNumber} 波完成，进入间歇`)
+    },
+    onAllWavesComplete: () => {
+      waveState.value = 'victory'
+      showVictoryScreen.value = true
+      // 强制退出暂停状态，确保 VictoryScreen 可交互
+      if (gameStore.isPaused) {
+        gameStore.resumeGame()
+      }
+      // 退出指针锁定
+      if (document.pointerLockElement) {
+        document.exitPointerLock()
+      }
+      console.log('通关！')
+    },
+  })
+
+  // ===== 初始化道具管理器 =====
+  powerUpManager = new PowerUpManager()
+  powerUpManager.setScene(sceneObj)
+  powerUpManager.setCallbacks({
+    onHealthPickup: (amount: number) => {
+      // 恢复生命
+      const newHealth = Math.min(gameStore.maxHealth, gameStore.health + amount)
+      gameStore.health = newHealth
+      console.log(`恢复 ${amount} HP，当前 HP: ${newHealth}`)
+    },
+    onAmmoPickup: () => {
+      // 补满当前武器弹药
+      const weapon = weaponStore.currentWeapon
+      if (!weapon) return
+      const ammoData = weaponStore.ammo.get(weapon.id)
+      if (ammoData) {
+        ammoData.current = weapon.magazineSize
+        weaponStore.ammo.set(weapon.id, { ...ammoData })
+        console.log('弹药已补满')
+      }
+    },
+    onDoubleDamagePickup: (duration: number) => {
+      buffsStore.addBuff('doubleDamage', duration)
+      console.log(`双倍伤害激活，持续 ${duration} 秒`)
+    },
+  })
+
+  // 使用 watch 确保 EnemyManager 挂载后注册回调并开始第 1 波
+  let gameStarted = false
+  watch(enemyManagerRef, (mgr) => {
+    if (mgr && !gameStarted) {
+      gameStarted = true
+      mgr.setOnEnemyKilled((enemyId: string) => {
+        waveManager?.onEnemyKilled(enemyId)
+      })
+      mgr.setPowerUpManager(powerUpManager)
+      // 开始第 1 波（此时 enemyManager 已就绪）
+      waveManager?.startGame()
+    }
+  }, { immediate: true })
+
+  // 检查是否需要从存档恢复游戏
+  if (route.query.continue === 'true') {
+    const loaded = loadSavedGame()
+    if (loaded) {
+      console.log('已从存档恢复游戏')
+      if (gameStore.isPaused) {
+        if (document.pointerLockElement) {
+          document.exitPointerLock()
+        }
+      }
+    } else {
+      console.warn('存档恢复失败，开始新游戏')
+    }
+  }
+
   isLoading.value = false
+}
+
+// 按波次配置生成敌人
+const spawnWaveEnemies = (waveNumber: number): void => {
+  if (!enemyManagerRef.value) return
+  const config = WAVE_CONFIGS[waveNumber - 1]
+  if (!config) return
+
+  // 随机选择 2-3 个刷新点
+  const shuffled = [...SPAWN_POINTS].sort(() => Math.random() - 0.5)
+  const pointCount = 2 + Math.floor(Math.random() * 2) // 2-3
+  const selectedPoints = shuffled.slice(0, pointCount).map(
+    (p) => new THREE.Vector3(p.x, 0, p.z)
+  )
+
+  const configs: { type: EnemyTypeKeyword; count: number }[] = []
+  config.enemies.forEach((e) => {
+    configs.push({ type: e.type, count: e.count })
+  })
+
+  const spawnedIds = enemyManagerRef.value.spawnEnemies(configs, selectedPoints)
+  if (waveManager) {
+    waveManager.registerEnemies(spawnedIds)
+  }
 }
 
 // 敌人管理器引用（使用 ref 以便模板 ref 自动绑定）
@@ -187,27 +465,219 @@ const createObstacles = () => {
 }
 
 const handleKeyDown = (e: KeyboardEvent) => {
-  // Ignore if not in game
-  if (document.pointerLockElement !== containerRef.value) return
+  // F9键：手动存档
+  if (e.key === 'F9') {
+    e.preventDefault()
+    manualSave()
+    return
+  }
 
+  // ESC键：切换暂停
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    if (gameStore.isPaused) {
+      resumeGameAndLock()
+    } else if (gameStore.isPlaying) {
+      pauseGameAndUnlock()
+    }
+    return
+  }
+
+  // 空格键：波次间歇时提前开始
+  if (e.key === ' ' && waveState.value === 'intermission' && waveManager) {
+    e.preventDefault()
+    waveManager.skipIntermission()
+    return
+  }
+
+  // Ignore if not in game or game is paused
+  if (document.pointerLockElement !== containerRef.value || gameStore.isPaused) return
+
+  // 移动按键仍然直接处理（连续输入）
   switch (e.key.toLowerCase()) {
-    // Movement
     case 'w': keys.w = true; break
     case 'a': keys.a = true; break
     case 's': keys.s = true; break
     case 'd': keys.d = true; break
-    // Weapon switching (1-6)
-    case '1': weaponStore.switchWeapon(0); break
-    case '2': weaponStore.switchWeapon(1); break
-    case '3': weaponStore.switchWeapon(2); break
-    case '4': weaponStore.switchWeapon(3); break
-    case '5': weaponStore.switchWeapon(4); break
-    case '6': weaponStore.switchWeapon(5); break
-    // Cycle weapon (Q)
-    case 'q': weaponStore.cycleWeapon(); break
-    // Reload (R)
-    case 'r': weaponStore.reload(); break
+    // Shift: 跑动
+    case 'shift': isRunning.value = true; break
   }
+
+  // 让输入管理器处理离散动作（武器切换、换弹等）
+  inputManager.handleKeyDown(e.key)
+}
+
+// 设置输入管理器按键映射
+const setupInputMappings = () => {
+  // 加载用户自定义按键映射
+  const savedBindings = localStorage.getItem('game-key-bindings')
+  let bindings: KeyBindingConfig
+  if (savedBindings) {
+    try {
+      bindings = JSON.parse(savedBindings)
+    } catch {
+      bindings = { ...DEFAULT_KEY_BINDINGS }
+    }
+  } else {
+    bindings = { ...DEFAULT_KEY_BINDINGS }
+  }
+
+  // 辅助函数：根据 action 获取按键
+  const getKey = (action: string): string => {
+    return bindings[action] || DEFAULT_KEY_BINDINGS[action] || ''
+  }
+
+  // 武器切换 (1-6)
+  inputManager.registerKey(getKey('switch_weapon_1'), {
+    action: 'switch_weapon_0',
+    commandFactory: () => new SwitchWeaponCommand(
+      { value: weaponStore.currentWeaponIndex },
+      0,
+      (idx) => weaponStore.switchWeapon(idx)
+    ),
+    bufferable: false,
+  })
+
+  inputManager.registerKey(getKey('switch_weapon_2'), {
+    action: 'switch_weapon_1',
+    commandFactory: () => new SwitchWeaponCommand(
+      { value: weaponStore.currentWeaponIndex },
+      1,
+      (idx) => weaponStore.switchWeapon(idx)
+    ),
+    bufferable: false,
+  })
+
+  inputManager.registerKey(getKey('switch_weapon_3'), {
+    action: 'switch_weapon_2',
+    commandFactory: () => new SwitchWeaponCommand(
+      { value: weaponStore.currentWeaponIndex },
+      2,
+      (idx) => weaponStore.switchWeapon(idx)
+    ),
+    bufferable: false,
+  })
+
+  inputManager.registerKey(getKey('switch_weapon_4'), {
+    action: 'switch_weapon_3',
+    commandFactory: () => new SwitchWeaponCommand(
+      { value: weaponStore.currentWeaponIndex },
+      3,
+      (idx) => weaponStore.switchWeapon(idx)
+    ),
+    bufferable: false,
+  })
+
+  inputManager.registerKey(getKey('switch_weapon_5'), {
+    action: 'switch_weapon_4',
+    commandFactory: () => new SwitchWeaponCommand(
+      { value: weaponStore.currentWeaponIndex },
+      4,
+      (idx) => weaponStore.switchWeapon(idx)
+    ),
+    bufferable: false,
+  })
+
+  inputManager.registerKey(getKey('switch_weapon_6'), {
+    action: 'switch_weapon_5',
+    commandFactory: () => new SwitchWeaponCommand(
+      { value: weaponStore.currentWeaponIndex },
+      5,
+      (idx) => weaponStore.switchWeapon(idx)
+    ),
+    bufferable: false,
+  })
+
+  // Q：循环切换武器
+  inputManager.registerKey(getKey('cycle_weapon'), {
+    action: 'cycle_weapon',
+    commandFactory: () => ({
+      execute: () => weaponStore.cycleWeapon(),
+      undo: () => weaponStore.cycleWeapon(), // 再次切换回到上一个
+    }),
+    bufferable: false,
+  })
+
+  // R：换弹
+  inputManager.registerKey(getKey('reload'), {
+    action: 'reload',
+    commandFactory: () => new ReloadCommand(
+      () => weaponStore.reload()
+    ),
+    bufferable: false,
+  })
+
+  // Shift：跑动（按下时加速，释放时减速）
+  inputManager.registerKey(getKey('run'), {
+    action: 'run_toggle',
+    commandFactory: (isPressed) => ({
+      execute: () => { isRunning.value = isPressed },
+      undo: () => { isRunning.value = !isPressed },
+    }),
+    bufferable: false,
+  })
+
+  // B：屏息稳定（减少后坐力和散布）
+  inputManager.registerKey(getKey('hold_breath'), {
+    action: 'hold_breath',
+    commandFactory: (isPressed) => ({
+      execute: () => {
+        if (isPressed && breathStamina.value >= minStaminaToStart) {
+          isHoldingBreath.value = true
+        } else if (!isPressed) {
+          isHoldingBreath.value = false
+        }
+      },
+      undo: () => {
+        isHoldingBreath.value = false
+      },
+    }),
+    bufferable: false,
+  })
+
+  // Ctrl：下蹲（切换）
+  inputManager.registerKey(getKey('crouch'), {
+    action: 'crouch_toggle',
+    commandFactory: (isPressed) => new CrouchCommand(
+      { value: playerHeight.value },
+      isCrouching.value ? 1.6 : 0.8
+    ),
+    bufferable: false,
+  })
+
+  // Space：跳跃
+  inputManager.registerKey(getKey('jump'), {
+    action: 'jump',
+    commandFactory: () => new JumpCommand(
+      playerPosition,
+      1.5
+    ),
+    bufferable: true,
+  })
+
+  console.log('Input mappings initialized:', inputManager.getRegisteredKeys())
+}
+
+// 暂停游戏并退出指针锁定
+const pauseGameAndUnlock = () => {
+  gameStore.pauseGame()
+  if (document.pointerLockElement) {
+    document.exitPointerLock()
+  }
+  soundManager.playScope() // 使用现有的音效
+}
+
+// 恢复游戏并重新锁定指针
+const resumeGameAndLock = async () => {
+  gameStore.resumeGame()
+  if (containerRef.value) {
+    try {
+      await containerRef.value.requestPointerLock()
+    } catch (err) {
+      console.error('Failed to lock pointer:', err)
+    }
+  }
+  soundManager.playScope()
 }
 
 const handleKeyUp = (e: KeyboardEvent) => {
@@ -217,6 +687,9 @@ const handleKeyUp = (e: KeyboardEvent) => {
     case 's': keys.s = false; break
     case 'd': keys.d = false; break
   }
+
+  // 让输入管理器处理离散动作
+  inputManager.handleKeyUp(e.key)
 }
 
 const handleMouseMove = (e: MouseEvent) => {
@@ -253,8 +726,21 @@ const handleClick = async () => {
 const handleMouseDown = (e: MouseEvent) => {
   if (document.pointerLockElement !== containerRef.value) return
 
-  if (e.button === 0) {
-    // Left click: fire
+  // 从按键映射读取射击键配置
+  const savedBindings = localStorage.getItem('game-key-bindings')
+  let shootKey = 'mouseleft'
+  if (savedBindings) {
+    try {
+      const bindings = JSON.parse(savedBindings)
+      shootKey = bindings['shoot'] || 'mouseleft'
+    } catch {}
+  }
+
+  // 映射鼠标按钮：mouseleft → 0, mouseright → 2
+  const buttonMap: Record<string, number> = { mouseleft: 0, mouseright: 2 }
+  const shootButton = buttonMap[shootKey] ?? 0
+
+  if (e.button === shootButton) {
     isFiring.value = true
     fire()
   }
@@ -270,7 +756,21 @@ const handleMouseUp = (e: MouseEvent) => {
 const handleContextMenu = (e: MouseEvent) => {
   e.preventDefault()
   if (document.pointerLockElement !== containerRef.value) return
-  weaponStore.toggleScope()
+
+  // 从按键映射读取瞄准键配置
+  const savedBindings = localStorage.getItem('game-key-bindings')
+  let scopeKey = 'mouseright'
+  if (savedBindings) {
+    try {
+      const bindings = JSON.parse(savedBindings)
+      scopeKey = bindings['scope'] || 'mouseright'
+    } catch {}
+  }
+
+  // 只有配置为鼠标右键时才执行
+  if (scopeKey === 'mouseright') {
+    weaponStore.toggleScope()
+  }
 }
 
 // Fire weapon
@@ -296,13 +796,16 @@ const fire = () => {
   // Attempt to fire (checks ammo and reload state)
   const fired = weaponStore.fire()
   if (fired) {
+    // Apply recoil
+    applyRecoil(weapon)
+
     // RPG 武器：发射火箭弹道
     if (weapon.type === 'rpg') {
       fireRocket()
       // 屏幕震动效果
       startCameraShake(0.1, 0.03)
     } else {
-      // Perform raycast to check for enemy hits
+      // Perform raycast to check for enemy hits (with spread)
       performRaycast()
     }
     // Play fire sound
@@ -311,6 +814,49 @@ const fire = () => {
     // Play empty click if no ammo
     soundManager.playEmpty()
   }
+}
+
+// Apply weapon recoil to camera
+const applyRecoil = (weapon: any) => {
+  if (!camera) return
+
+  // Get recoil pattern (cycle through pattern array)
+  const pattern = weapon.recoilPattern || [{ x: 0, y: -0.5 }]
+  const patternIndex = recoilIndex.value % pattern.length
+  const recoil = pattern[patternIndex]
+
+  // Calculate recoil multiplier (breath hold reduces recoil)
+  let recoilMultiplier = 1.0
+  if (isHoldingBreath.value && breathStamina.value > 0) {
+    recoilMultiplier = 0.3 // 70% reduction when holding breath
+  }
+
+  // Apply recoil offset (scaled by recoilAmount and breath hold)
+  recoilOffset.value.x += recoil.x * weapon.recoilAmount * recoilMultiplier
+  recoilOffset.value.y += recoil.y * weapon.recoilAmount * recoilMultiplier
+
+  // Clamp recoil offset
+  recoilOffset.value.x = Math.max(-0.5, Math.min(0.5, recoilOffset.value.x))
+  recoilOffset.value.y = Math.max(-1.0, Math.min(0.2, recoilOffset.value.y))
+
+  // Update recoil index for next shot
+  recoilIndex.value++
+
+  // Apply to camera (pitch and yaw)
+  yaw += recoilOffset.value.x * 0.01
+  pitch += recoilOffset.value.y * 0.01
+  pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch))
+
+  if (camera) {
+    camera.rotation.order = 'YXZ'
+    camera.rotation.y = yaw
+    camera.rotation.x = pitch
+  }
+
+  // Increase spread
+  currentSpread.value = Math.min(weapon.spread, currentSpread.value + weapon.spread * 0.3)
+  lastFireTimeForRecoil.value = Date.now()
+  lastFireTimeForSpread.value = Date.now()
 }
 
 // RPG 火箭发射
@@ -495,8 +1041,19 @@ const handleRocketExplosion = (position: THREE.Vector3) => {
 const performRaycast = () => {
   if (!camera || !scene) return
 
+  // Apply spread to aim point (breath hold reduces spread)
+  let spread = currentSpread.value
+  if (isHoldingBreath.value && breathStamina.value > 0) {
+    spread *= 0.2 // 80% reduction when holding breath
+  }
+  const spreadRad = (spread * Math.PI) / 180
+  const randomAngle = Math.random() * Math.PI * 2
+  const randomRadius = Math.random() * spreadRad
+  const offsetX = Math.cos(randomAngle) * randomRadius
+  const offsetY = Math.sin(randomAngle) * randomRadius
+
   const raycaster = new THREE.Raycaster()
-  raycaster.setFromCamera(new THREE.Vector2(0, 0), camera)
+  raycaster.setFromCamera(new THREE.Vector2(offsetX, offsetY), camera)
 
   // 检测场景中的敌人
   const enemyGroup = scene.getObjectByName('enemies')
@@ -515,7 +1072,11 @@ const performRaycast = () => {
         // 检查是否是敌人
         const enemy = enemyManagerRef.value?.getActiveEnemies().find((e: any) => e.mesh === object)
         if (enemy && !enemy.isDead) {
-          const damage = weaponStore.currentWeapon?.damage || 10
+          let damage = weaponStore.currentWeapon?.damage || 10
+          // 双倍伤害 Buff
+          if (buffsStore.hasBuff('doubleDamage')) {
+            damage *= 2
+          }
           enemyManagerRef.value?.onEnemyHit(enemy.id, damage)
 
           // 播放击中特效
@@ -591,6 +1152,94 @@ const updateAutoFire = (delta: number) => {
   }
 }
 
+// Update recoil recovery
+const updateRecoilRecovery = (delta: number) => {
+  const weapon = weaponStore.currentWeapon
+  if (!weapon) return
+
+  const now = Date.now()
+
+  // Recoil recovery
+  if (recoilOffset.value.x !== 0 || recoilOffset.value.y !== 0) {
+    const recovery = weapon.recoilRecovery * delta
+    recoilOffset.value.x *= (1 - recovery)
+    recoilOffset.value.y *= (1 - recovery)
+
+    // Snap to zero if very small
+    if (Math.abs(recoilOffset.value.x) < 0.001) recoilOffset.value.x = 0
+    if (Math.abs(recoilOffset.value.y) < 0.001) recoilOffset.value.y = 0
+  }
+
+  // Spread recovery
+  if (currentSpread.value > 0) {
+    const spreadRecovery = weapon.spreadRecovery * delta
+    currentSpread.value *= (1 - spreadRecovery)
+
+    // Snap to zero if very small
+    if (currentSpread.value < 0.01) currentSpread.value = 0
+  }
+
+  // Reset recoil pattern index if not fired for a while
+  if (now - lastFireTimeForRecoil.value > 1000) {
+    recoilIndex.value = 0
+  }
+
+  // Breath stamina management
+  if (isHoldingBreath.value && breathStamina.value > 0) {
+    // Consume stamina
+    breathStamina.value -= breathConsumptionRate * delta
+    if (breathStamina.value <= 0) {
+      breathStamina.value = 0
+      isHoldingBreath.value = false
+    }
+  } else {
+    // Recover stamina when not holding breath
+    if (breathStamina.value < maxBreathStamina) {
+      breathStamina.value += breathRecoveryRate * delta
+      if (breathStamina.value > maxBreathStamina) {
+        breathStamina.value = maxBreathStamina
+      }
+    }
+  }
+}
+
+// Update view sway (aiming sway / breathing simulation)
+const updateSway = (delta: number) => {
+  if (!camera) return
+
+  // Check if aiming (scope active or holding breath)
+  const isAiming = weaponStore.currentScope.isActive || isHoldingBreath.value
+  const multiplier = isAiming ? aimingSwayMultiplier : 1.0
+
+  // Update sway time
+  swayTime.value += delta * swaySpeed
+  breathingTime.value += delta * breathingSpeed
+
+  // Calculate sway offset (figure-8 pattern using sin/cos)
+  const swayX = Math.sin(swayTime.value) * swayAmount * multiplier
+  const swayY = Math.sin(swayTime.value * 0.7) * swayAmount * 0.5 * multiplier
+
+  swayOffset.value = { x: swayX, y: swayY }
+
+  // Calculate breathing sway (subtle vertical movement)
+  const breathY = Math.sin(breathingTime.value) * breathingAmount * multiplier
+  const breathX = Math.sin(breathingTime.value * 0.5) * breathingAmount * 0.3 * multiplier
+  breathingSway.value = { x: breathX, y: breathY }
+
+  // Apply sway to camera (add to yaw and pitch)
+  const baseYaw = yaw
+  const basePitch = pitch
+  yaw = baseYaw + swayOffset.value.x + breathingSway.value.x
+  pitch = basePitch + swayOffset.value.y + breathingSway.value.y
+
+  // Clamp pitch
+  pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch))
+
+  camera.rotation.order = 'YXZ'
+  camera.rotation.y = yaw
+  camera.rotation.x = pitch
+}
+
 const updateMovement = (delta: number) => {
   if (!camera) return
 
@@ -601,6 +1250,11 @@ const updateMovement = (delta: number) => {
   if (keys.a) direction.x -= 1
   if (keys.d) direction.x += 1
 
+  // 计算实际速度（考虑跑动和下蹲）
+  let speed = moveSpeed
+  if (isRunning.value) speed *= 1.5  // 跑动加速
+  if (isCrouching.value) speed *= 0.5  // 下蹲减速
+
   if (direction.length() > 0) {
     direction.normalize()
     direction.applyQuaternion(camera.quaternion)
@@ -609,8 +1263,8 @@ const updateMovement = (delta: number) => {
 
     // 在移动前保存当前位置
     const newPosition = playerPosition.clone()
-    newPosition.x += direction.x * moveSpeed * delta
-    newPosition.z += direction.z * moveSpeed * delta
+    newPosition.x += direction.x * speed * delta
+    newPosition.z += direction.z * speed * delta
 
     // 检查移动后的新位置是否与障碍物发生碰撞
     if (!collisionDetector.checkCollision(newPosition)) {
@@ -618,7 +1272,21 @@ const updateMovement = (delta: number) => {
     }
   }
 
-  camera.position.copy(playerPosition)
+  // 跳跃物理
+  if (isJumping.value) {
+    jumpVelocity.value += gravity * delta
+    playerPosition.y += jumpVelocity.value * delta
+
+    // 落地检测
+    if (playerPosition.y <= playerHeight.value) {
+      playerPosition.y = playerHeight.value
+      isJumping.value = false
+      jumpVelocity.value = 0
+    }
+  }
+
+  // 更新相机位置（使用玩家高度）
+  camera.position.set(playerPosition.x, playerPosition.y, playerPosition.z)
 }
 
 let lastTime = performance.now()
@@ -628,10 +1296,15 @@ const gameLoop = () => {
   const delta = (now - lastTime) / 1000
   lastTime = now
 
-  // 死亡时暂停所有游戏更新，只保持渲染
-  if (!gameStore.isDead) {
+  // 死亡或暂停时暂停所有游戏更新，只保持渲染
+  if (!gameStore.isDead && !gameStore.isPaused) {
+    // 处理输入缓冲
+    inputManager.processInputBuffer()
+
     updateMovement(delta)
     updateAutoFire(delta)
+    updateRecoilRecovery(delta)
+    updateSway(delta)
 
     // 更新敌人管理器
     if (enemyManagerRef.value) {
@@ -641,6 +1314,20 @@ const gameLoop = () => {
     // 更新火箭管理器
     if (rocketManager) {
       rocketManager.update(delta, playerPosition)
+    }
+
+    // 更新道具管理器
+    if (powerUpManager) {
+      powerUpManager.update(delta, performance.now() / 1000)
+    }
+
+    // 更新波次管理器（间歇倒计时）
+    if (waveManager) {
+      waveManager.update(delta)
+      // 同步间歇倒计时到 HUD
+      if (waveState.value === 'intermission') {
+        intermissionCountdown.value = waveManager.getIntermissionRemaining()
+      }
     }
 
     // 更新屏幕震动
@@ -667,7 +1354,106 @@ const exitGame = () => {
   if (document.pointerLockElement) {
     document.exitPointerLock()
   }
+  // 自动存档
+  saveCurrentGame()
   router.push({ name: 'Home' })
+}
+
+// 保存当前游戏状态
+const saveCurrentGame = () => {
+  if (!gameStore.isPlaying && !gameStore.isPaused) return
+
+  const saveData: GameSaveData = {
+    timestamp: Date.now(),
+    player: {
+      health: gameStore.health,
+      position: { x: playerPosition.x, y: playerPosition.y, z: playerPosition.z },
+      rotation: { yaw, pitch },
+    },
+    game: {
+      score: gameStore.score,
+      kills: gameStore.kills,
+      gameTime: gameStore.gameTime,
+      state: gameStore.gameState,
+    },
+    weapon: {
+      currentIndex: weaponStore.currentWeaponIndex,
+      ammo: Object.fromEntries(weaponStore.ammo) as Record<string, { current: number; reserve: number }>,
+    },
+  }
+
+  storageManager.saveGame(saveData).then((success) => {
+    if (success) {
+      console.log('游戏已自动存档')
+    }
+  })
+}
+
+// 手动存档（F5键）
+const manualSave = () => {
+  saveCurrentGame()
+  // 显示存档提示
+  alert('游戏已存档！')
+}
+
+// 从存档恢复游戏状态
+const loadSavedGame = (): boolean => {
+  const saveData = storageManager.loadGame()
+  if (!saveData) {
+    console.warn('没有找到存档')
+    return false
+  }
+
+  console.log('正在从存档恢复游戏...', saveData)
+
+  // 恢复玩家状态
+  gameStore.health = saveData.player.health
+  playerPosition.set(
+    saveData.player.position.x,
+    saveData.player.position.y,
+    saveData.player.position.z
+  )
+  yaw = saveData.player.rotation.yaw
+  pitch = saveData.player.rotation.pitch
+
+  // 恢复相机位置和旋转
+  if (camera) {
+    camera.position.copy(playerPosition)
+    camera.rotation.order = 'YXZ'
+    camera.rotation.y = yaw
+    camera.rotation.x = pitch
+  }
+
+  // 恢复游戏状态
+  gameStore.score = saveData.game.score
+  gameStore.kills = saveData.game.kills
+  gameStore.gameTime = saveData.game.gameTime
+
+  // 恢复游戏状态（如果之前是暂停状态，需要暂停游戏）
+  if (saveData.game.state === 'paused') {
+    gameStore.gameState = 'paused'
+  } else if (saveData.game.state === 'playing') {
+    gameStore.gameState = 'playing'
+  }
+
+  // 恢复武器状态
+  weaponStore.switchWeapon(saveData.weapon.currentIndex)
+
+  // 恢复弹药状态
+  // 注意：这里需要直接修改 weaponStore 的内部状态
+  // 为了简化，我们重新加载弹药数据
+  if (saveData.weapon.ammo) {
+    Object.entries(saveData.weapon.ammo).forEach(([key, value]) => {
+      const ammoData = weaponStore.ammo.get(key)
+      if (ammoData && value) {
+        ammoData.current = value.current
+        ammoData.reserve = value.reserve
+      }
+    })
+  }
+
+  console.log('游戏已从存档恢复')
+  return true
 }
 
 // 死亡界面相关
@@ -690,12 +1476,41 @@ const onRestart = () => {
   enemyManagerRef.value?.reset()
   // 重置所有武器弹药
   weaponStore.resetAmmo()
+  // 清理道具和 Buff
+  powerUpManager?.dispose()
+  buffsStore.clearAll()
+  // 隐藏通关界面
+  showVictoryScreen.value = false
+  // 重置波次管理器
+  waveManager?.reset()
   // 重置时间基准，避免首帧 delta 过大
   lastTime = performance.now()
 }
 
 const onGoHome = () => {
   exitGame()
+}
+
+// 通关界面按钮
+const onVictoryRestart = () => {
+  showVictoryScreen.value = false
+  // 确保退出暂停状态
+  if (gameStore.isPaused) {
+    gameStore.resumeGame()
+  }
+  onRestart()
+  // 重新锁定指针
+  if (containerRef.value) {
+    containerRef.value.requestPointerLock().catch(() => {})
+  }
+}
+
+const onVictoryGoHome = () => {
+  showVictoryScreen.value = false
+  // 保存得分
+  saveCurrentGame()
+  // 退出到主页
+  router.push({ name: 'Home' })
 }
 
 // Track previous states for sound effects
@@ -727,6 +1542,12 @@ onMounted(() => {
   document.addEventListener('mouseup', handleMouseUp)
   containerRef.value?.addEventListener('contextmenu', handleContextMenu)
 
+  // 检测触摸设备
+  isTouchDevice.value = 'ontouchstart' in window || navigator.maxTouchPoints > 0
+
+  // 初始化输入管理器按键映射
+  setupInputMappings()
+
   // Start game loop after a brief delay to ensure scene is loaded
   setTimeout(() => {
     lastTime = performance.now() // 重置时间基准，避免首帧 delta 过大
@@ -752,6 +1573,10 @@ onUnmounted(() => {
 
   // 清理火箭管理器
   rocketManager?.clear()
+
+  // 清理波次管理器和道具管理器
+  waveManager?.dispose()
+  powerUpManager?.dispose()
 })
 
 
@@ -1014,6 +1839,34 @@ onMounted(() => {
         requestAnimationFrame(check)
       })
     },
+
+    // ===== 波次系统测试 API =====
+
+    // 获取当前波次
+    getCurrentWave: () => {
+      return waveManager?.getCurrentWave() ?? 1
+    },
+
+    // 获取波次状态
+    getWaveState: () => {
+      return waveManager?.getState() ?? 'waving'
+    },
+
+    // 跳过间歇
+    skipIntermission: () => {
+      waveManager?.skipIntermission()
+    },
+
+    // 获取活跃道具数量
+    getPowerUpCount: () => {
+      return powerUpManager?.getActiveCount() ?? 0
+    },
+
+    // 获取 Buff 状态
+    hasBuff: (type: string) => {
+      return buffsStore.hasBuff(type)
+    },
+
   }
 })
 
@@ -1070,7 +1923,42 @@ onMounted(() => {
           <span>得分: {{ gameStore.score }}</span>
           <span class="kills">击杀: {{ gameStore.kills }}</span>
         </div>
+        <!-- 屏息体力条 -->
+        <div v-if="breathStamina < maxBreathStamina" class="breath-bar">
+          <div class="breath-fill" :style="breathBarStyle" :class="{ low: breathStamina < 20 }"></div>
+          <span class="breath-label" v-if="isHoldingBreath">屏息中...</span>
+        </div>
       </div>
+
+      <!-- 波次显示 -->
+      <div class="wave-display" :class="{ 'boss-wave': isBossWave }">
+        <span class="wave-icon">{{ isBossWave ? '👑' : '⚔️' }}</span>
+        <span class="wave-text">{{ waveProgressText }}</span>
+      </div>
+
+      <!-- Buff 状态图标 -->
+      <div v-if="activeBuffs.length > 0" class="buff-bar">
+        <div
+          v-for="buff in activeBuffs"
+          :key="buff.type"
+          class="buff-icon"
+          :data-buff-type="buff.type"
+        >
+          <span class="buff-emoji">{{ buff.type === 'doubleDamage' ? '⚡' : '✨' }}</span>
+          <span class="buff-timer">{{ buffsStore.getBuffRemaining(buff.type) }}s</span>
+        </div>
+      </div>
+
+      <!-- 波次间歇倒计时 -->
+      <transition name="wave-countdown">
+        <div v-if="waveState === 'intermission'" class="wave-intermission">
+          <div class="intermission-content">
+            <div class="intermission-label">第 {{ currentWave + 1 }} 波即将开始</div>
+            <div class="intermission-countdown">{{ Math.ceil(intermissionCountdown) }}</div>
+            <div class="intermission-hint">按 空格键 跳过</div>
+          </div>
+        </div>
+      </transition>
 
       <!-- Crosshair -->
       <div class="crosshair" :class="{ 'scope-active': weaponStore.currentScope.isActive }">
@@ -1108,7 +1996,53 @@ onMounted(() => {
       </div>
     </div>
 
+    <!-- 触摸屏虚拟控制（仅在触摸设备显示） -->
+    <template v-if="isTouchDevice">
+      <!-- 左侧虚拟摇杆（移动） -->
+      <VirtualJoystick
+        @move="onVirtualMove"
+        @stop="onVirtualStop"
+      />
+
+      <!-- 右侧虚拟按钮 -->
+      <div class="virtual-buttons-right">
+        <VirtualButton label="射击" type="shoot" @press="onVirtualButtonPress" @release="onVirtualButtonRelease" />
+        <VirtualButton label="跳跃" type="jump" @press="onVirtualButtonPress" />
+        <VirtualButton label="下蹲" type="crouch" @press="onVirtualButtonPress" />
+        <VirtualButton label="换弹" type="reload" @press="onVirtualButtonPress" />
+        <VirtualButton label="倍镜" type="scope" @press="onVirtualButtonPress" />
+      </div>
+
+      <!-- 右侧触摸区域（视角控制） -->
+      <div
+        class="touch-look-area"
+        @touchstart="onTouchLookStart"
+        @touchmove="onTouchLookMove"
+        @touchend="onTouchLookEnd"
+      ></div>
+    </template>
+
     <button class="exit-btn" @click.stop="exitGame">退出游戏</button>
+    <!-- 暂停菜单 -->
+    <transition name="pause-menu">
+      <div v-if="gameStore.isPaused" class="pause-overlay">
+        <div class="pause-menu">
+          <h2 class="pause-title">游戏暂停</h2>
+          <div class="pause-buttons">
+            <button class="pause-btn resume-btn" @click="resumeGameAndLock">
+              <span>继续游戏</span>
+            </button>
+            <button class="pause-btn restart-btn" @click="onRestart">
+              <span>重新开始</span>
+            </button>
+            <button class="pause-btn exit-btn" @click="exitGame">
+              <span>退出游戏</span>
+            </button>
+          </div>
+          <p class="pause-hint">按 ESC 继续游戏</p>
+        </div>
+      </div>
+    </transition>
 
     <!-- 死亡界面 -->
     <DeathScreen
@@ -1116,6 +2050,14 @@ onMounted(() => {
       :survival-time="gameStore.gameTime"
       @restart="onRestart"
       @go-home="onGoHome"
+    />
+
+    <!-- 通关界面 -->
+    <VictoryScreen
+      :visible="showVictoryScreen"
+      :survival-time="gameStore.gameTime"
+      @restart="onVictoryRestart"
+      @go-home="onVictoryGoHome"
     />
   </div>
 </template>
@@ -1217,6 +2159,39 @@ onMounted(() => {
 .kills {
   font-size: 16px;
   color: #FF6B6B;
+}
+
+/* 屏息体力条 */
+.breath-bar {
+  position: relative;
+  width: 150px;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.breath-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00C6FF, #0072FF);
+  border-radius: 4px;
+  transition: width 0.1s ease-out;
+}
+
+.breath-fill.low {
+  background: linear-gradient(90deg, #FF3B30, #FF6B6B);
+}
+
+.breath-label {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #00C6FF;
+  font-size: 12px;
+  white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .crosshair {
@@ -1355,5 +2330,274 @@ onMounted(() => {
 .exit-btn:hover {
   background: #FF3B30;
   transform: scale(1.05);
+}
+
+/* 暂停菜单 */
+.pause-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  pointer-events: auto;
+}
+
+.pause-menu {
+  text-align: center;
+  color: #fff;
+}
+
+.pause-title {
+  font-size: 3rem;
+  margin-bottom: 40px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+  animation: fadeInDown 0.3s ease-out;
+}
+
+.pause-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.pause-btn {
+  width: 250px;
+  height: 60px;
+  border: none;
+  border-radius: 12px;
+  font-size: 1.3rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+  pointer-events: auto;
+}
+
+.pause-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2);
+}
+
+.pause-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+}
+
+.resume-btn {
+  background: linear-gradient(135deg, #34C759, #30D158);
+  color: #fff;
+}
+
+.restart-btn {
+  background: linear-gradient(135deg, #007AFF, #5856D6);
+  color: #fff;
+}
+
+.pause-hint {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.6);
+  animation: fadeIn 0.5s ease-out 0.3s both;
+}
+
+/* 暂停菜单动画 */
+.pause-menu-enter-active,
+.pause-menu-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.pause-menu-enter-from,
+.pause-menu-leave-to {
+  opacity: 0;
+}
+
+.pause-menu-enter-active .pause-menu,
+.pause-menu-leave-active .pause-menu {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.pause-menu-enter-from .pause-menu,
+.pause-menu-leave-to .pause-menu {
+  transform: scale(0.9);
+  opacity: 0;
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ===== 波次 HUD ===== */
+.wave-display {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  border-radius: 24px;
+  padding: 6px 20px;
+  pointer-events: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.wave-display.boss-wave {
+  border-color: rgba(255, 215, 0, 0.7);
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.3);
+}
+
+.wave-icon {
+  font-size: 20px;
+}
+
+.wave-text {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* ===== Buff 状态栏 ===== */
+.buff-bar {
+  position: absolute;
+  top: 125px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.buff-icon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+  border-radius: 10px;
+  padding: 4px 10px;
+  border: 2px solid rgba(255, 221, 68, 0.5);
+  min-width: 48px;
+}
+
+.buff-icon[data-buff-type="doubleDamage"] {
+  border-color: rgba(255, 221, 68, 0.6);
+  box-shadow: 0 0 8px rgba(255, 221, 68, 0.3);
+}
+
+.buff-emoji {
+  font-size: 20px;
+  line-height: 1.2;
+}
+
+.buff-timer {
+  color: #FFD700;
+  font-size: 12px;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* ===== 波次间歇倒计时 ===== */
+.wave-intermission {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  pointer-events: none;
+}
+
+.intermission-content {
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(12px);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  padding: 32px 48px;
+  animation: intermissionFadeIn 0.3s ease-out;
+}
+
+@keyframes intermissionFadeIn {
+  from { opacity: 0; transform: scale(0.9); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.intermission-label {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.intermission-countdown {
+  font-size: 72px;
+  font-weight: 800;
+  color: #FFD700;
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 215, 0, 0.3);
+  line-height: 1;
+  margin-bottom: 8px;
+}
+
+.intermission-hint {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 14px;
+}
+
+.wave-countdown-enter-active,
+.wave-countdown-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.wave-countdown-enter-from,
+.wave-countdown-leave-to {
+  opacity: 0;
+}
+
+/* 虚拟按钮容器（右侧） */
+.virtual-buttons-right {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.virtual-buttons-right .virtual-button {
+  pointer-events: auto;
+}
+
+/* 触摸视角控制区域（右侧大半屏） */
+.touch-look-area {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 50%;
+  height: 100%;
+  z-index: 999;
+  pointer-events: auto;
+  touch-action: none;
 }
 </style>

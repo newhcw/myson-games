@@ -9,6 +9,9 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import * as THREE from 'three'
 import { enemyAI } from '@/game/enemies/EnemyAI'
 import { ProjectileManager } from '@/game/enemies/ProjectileManager'
+import type { PowerUpManager } from '@/game/powerups/PowerUpManager'
+import { DROP_RATES, BOSS_DROP_COUNT } from '@/game/powerups/types'
+import type { EnemyTypeKeyword } from '@/game/wave/types'
 
 interface Props {
   scene: THREE.Scene
@@ -25,27 +28,68 @@ const emit = defineEmits<{
 
 const containerRef = ref<HTMLDivElement | null>(null)
 let enemies: string[] = []
+let enemyTypes: Map<string, EnemyTypeKeyword> = new Map()
 let animationTime = 0
 let projectileManager: ProjectileManager | null = null
+let powerUpManager: PowerUpManager | null = null
+let onEnemyKilledCallback: ((enemyId: string) => void) | null = null
 
-// 生成初始敌人
-const spawnInitialEnemies = () => {
-  // 生成5个敌人
-  const spawnPositions = [
-    new THREE.Vector3(10, 0, 10),
-    new THREE.Vector3(-10, 0, 10),
-    new THREE.Vector3(10, 0, -10),
-    new THREE.Vector3(-10, 0, -10),
-    new THREE.Vector3(0, 0, 15)
-  ]
+/**
+ * 按波次配置生成敌人（Task 4.2）
+ * @param configs 敌人配置数组 [{type, count}]
+ * @param spawnPoints 刷新点数组
+ */
+const spawnEnemies = (
+  configs: { type: EnemyTypeKeyword; count: number }[],
+  spawnPoints: THREE.Vector3[]
+): string[] => {
+  const spawnedIds: string[] = []
+  let pointIndex = 0
 
-  spawnPositions.forEach((pos, index) => {
-    const enemyType = index < 3 ? 'soldier' : index < 4 ? 'elite' : 'boss'
-    const enemy = enemyAI.spawnEnemy(enemyType, pos)
-    enemies.push(enemy.id)
-    // 保存生成数据
-    enemySpawnData.set(enemy.id, { type: enemyType, position: pos })
+  configs.forEach(({ type, count }) => {
+    for (let i = 0; i < count; i++) {
+      // 循环使用刷新点
+      const point = spawnPoints[pointIndex % spawnPoints.length]
+      pointIndex++
+
+      const enemy = enemyAI.spawnEnemy(type, point.clone())
+      enemies.push(enemy.id)
+      enemyTypes.set(enemy.id, type)
+      spawnedIds.push(enemy.id)
+    }
   })
+
+  return spawnedIds
+}
+
+/**
+ * 敌人击杀时触发道具掉落判定（Task 4.3）
+ */
+const handleEnemyDrop = (enemyId: string): void => {
+  if (!powerUpManager) return
+
+  const enemyType = enemyTypes.get(enemyId)
+  if (!enemyType) return
+
+  const dropRate = DROP_RATES[enemyType] || 0
+  const dropCount = enemyType === 'boss' ? BOSS_DROP_COUNT : 1
+
+  // 获取敌人位置
+  const enemy = enemyAI.getActiveEnemies().find((e: any) => e.id === enemyId)
+  if (!enemy) return
+  const pos = enemy.position.clone()
+
+  for (let i = 0; i < dropCount; i++) {
+    if (Math.random() < dropRate) {
+      const randomType = PowerUpManager.randomType()
+      const offset = new THREE.Vector3(
+        (Math.random() - 0.5) * 1.5,
+        0,
+        (Math.random() - 0.5) * 1.5
+      )
+      powerUpManager.spawn({ type: randomType, position: pos.clone().add(offset) })
+    }
+  }
 }
 
 // 更新循环
@@ -60,43 +104,48 @@ const update = (delta: number) => {
     projectileManager.setPlayerPosition(props.playerPosition)
     projectileManager.update(delta)
   }
-}
 
-// 存储敌人的初始位置和类型
-const enemySpawnData: Map<string, { type: string; position: THREE.Vector3 }> = new Map()
+  // 更新道具管理器
+  if (powerUpManager) {
+    powerUpManager.setPlayerPosition(props.playerPosition)
+    powerUpManager.update(delta, animationTime)
+  }
+}
 
 // 处理敌人受伤
 const onEnemyHit = (enemyId: string, damage: number): boolean => {
   const result = enemyAI.enemyHit(enemyId, damage)
 
   if (result.killed) {
-    emit('enemy-killed', enemyId, 100) // 击杀分数
+    const score = enemyAI.getActiveEnemies().find((e: any) => e.id === enemyId)?.config?.scoreValue || 100
+    emit('enemy-killed', enemyId, score)
+
+    // 从追踪列表中移除
     const index = enemies.indexOf(enemyId)
     if (index > -1) {
       enemies.splice(index, 1)
     }
 
-    // 获取敌人的初始生成数据
-    const spawnData = enemySpawnData.get(enemyId)
+    // 道具掉落
+    handleEnemyDrop(enemyId)
 
-    // 30秒后原位置重生
-    setTimeout(() => {
-      if (spawnData) {
-        const enemy = enemyAI.spawnEnemy(spawnData.type, spawnData.position)
-        enemies.push(enemy.id)
-        // 更新新的敌人ID对应的生成数据
-        enemySpawnData.set(enemy.id, spawnData)
-      }
-    }, 30000) // 30秒重生（30000毫秒）
+    // 通知波次管理器
+    onEnemyKilledCallback?.(enemyId)
+
+    // 清理 type 映射
+    enemyTypes.delete(enemyId)
   }
 
   return result.killed
 }
 
+/** 设置击杀回调（由 WaveManager 注册） */
+const setOnEnemyKilled = (cb: (enemyId: string) => void): void => {
+  onEnemyKilledCallback = cb
+}
+
 onMounted(() => {
-  // 设置 EnemyAI
   if (props.scene && props.camera) {
-    // 创建一个 group 来存放所有敌人
     const enemyGroup = new THREE.Group()
     enemyGroup.name = 'enemies'
     props.scene.add(enemyGroup)
@@ -113,7 +162,6 @@ onMounted(() => {
       }
     })
 
-    // 初始化子弹管理器
     projectileManager = new ProjectileManager(100)
     projectileManager.setScene(enemyGroup)
     projectileManager.setOnPlayerHit((damage: number) => {
@@ -121,11 +169,9 @@ onMounted(() => {
     })
     enemyAI.setProjectileManager(projectileManager)
 
-    // 生成初始敌人
-    spawnInitialEnemies()
+    // 不再在此处生成敌人，改为由 WaveManager 通过 spawnEnemies 调用
   }
 
-  // 将容器设置为游戏 UI 容器
   if (containerRef.value) {
     containerRef.value.id = 'game-ui'
   }
@@ -134,23 +180,29 @@ onMounted(() => {
 onUnmounted(() => {
   enemyAI.clear()
   projectileManager?.clear()
+  powerUpManager?.dispose()
 })
 
 // 暴露方法给父组件
 defineExpose({
   update,
   onEnemyHit,
+  spawnEnemies,
+  setOnEnemyKilled,
+  setPowerUpManager: (mgr: PowerUpManager) => { powerUpManager = mgr },
   reset: () => {
     enemyAI.clear()
     projectileManager?.clear()
+    powerUpManager?.dispose()
     enemies = []
-    enemySpawnData.clear()
-    spawnInitialEnemies()
+    enemyTypes.clear()
+    onEnemyKilledCallback = null
   },
   getActiveEnemies: () => enemyAI.getActiveEnemies(),
   getHealthBarCount: () => enemyAI.getHealthBarCount(),
   getProjectileManager: () => projectileManager,
-  getActiveProjectileCount: () => projectileManager?.getActiveCount() || 0
+  getActiveProjectileCount: () => projectileManager?.getActiveCount() || 0,
+  getPowerUpManager: () => powerUpManager,
 })
 </script>
 

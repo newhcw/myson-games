@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { DEFAULT_KEY_BINDINGS, ACTION_LABELS, KEY_LABELS, getKeyLabel, type KeyBindingConfig } from '@/game/input/KeyBindings'
 
 const router = useRouter()
 
@@ -10,6 +11,75 @@ const settings = ref({
   difficulty: 'normal',
   showDamageNumber: true,
   autoAim: false,
+})
+
+// 按键映射
+const keyBindings = ref<KeyBindingConfig>({ ...DEFAULT_KEY_BINDINGS })
+const editingAction = ref<string | null>(null)
+
+// 加载按键映射
+onMounted(() => {
+  const saved = localStorage.getItem('game-key-bindings')
+  if (saved) {
+    try {
+      keyBindings.value = JSON.parse(saved)
+    } catch {
+      keyBindings.value = { ...DEFAULT_KEY_BINDINGS }
+    }
+  }
+})
+
+// 开始重新绑定按键
+const startBinding = (action: string) => {
+  editingAction.value = action
+}
+
+// 处理按键事件
+const handleKeyDown = (e: KeyboardEvent) => {
+  if (!editingAction.value) return
+
+  e.preventDefault()
+  const action = editingAction.value
+  const newKey = e.key.toLowerCase()
+
+  // 检查是否与其他动作冲突
+  const existingAction = Object.keys(keyBindings.value).find(
+    (act) => keyBindings.value[act] === newKey && act !== action
+  )
+
+  if (existingAction) {
+    alert(`按键 ${getKeyLabel(newKey)} 已被用于 ${ACTION_LABELS[existingAction] || existingAction}`)
+    return
+  }
+
+  // 更新映射
+  keyBindings.value = { ...keyBindings.value, [action]: newKey }
+  editingAction.value = null
+
+  // 保存
+  localStorage.setItem('game-key-bindings', JSON.stringify(keyBindings.value))
+}
+
+// 取消绑定
+const cancelBinding = () => {
+  editingAction.value = null
+}
+
+// 重置为默认
+const resetKeyBindings = () => {
+  if (confirm('确定要重置所有按键映射到默认值吗？')) {
+    keyBindings.value = { ...DEFAULT_KEY_BINDINGS }
+    localStorage.setItem('game-key-bindings', JSON.stringify(keyBindings.value))
+  }
+}
+
+// 监听按键
+onMounted(() => {
+  window.addEventListener('keydown', handleKeyDown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
 })
 
 const saveSettings = () => {
@@ -73,6 +143,29 @@ const resetProgress = () => {
             type="checkbox"
             v-model="settings.autoAim"
           />
+        </div>
+      </section>
+
+      <section class="setting-group">
+        <h2>按键映射配置</h2>
+        <div v-if="editingAction" class="binding-hint">
+          请按下新的按键来绑定 "{{ ACTION_LABELS[editingAction] || editingAction }}"...
+          <button class="cancel-btn" @click="cancelBinding">取消</button>
+        </div>
+        <div v-else>
+          <div
+            v-for="(key, action) in keyBindings"
+            :key="action"
+            class="setting-item binding-item"
+            @click="startBinding(action)"
+            :class="{ editing: editingAction === action }"
+          >
+            <label>{{ ACTION_LABELS[action] || action }}</label>
+            <span class="key-label">{{ KEY_LABELS[key] || key.toUpperCase() }}</span>
+          </div>
+          <button class="reset-btn" @click="resetKeyBindings">
+            重置为默认按键
+          </button>
         </div>
       </section>
 
@@ -218,5 +311,41 @@ const resetProgress = () => {
   background: var(--color-primary-dark);
   transform: scale(1.05);
   box-shadow: var(--shadow-glow);
+}
+
+.binding-hint {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  margin-bottom: var(--spacing-md);
+  text-align: center;
+  font-weight: 600;
+}
+
+.binding-item {
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.binding-item:hover {
+  background: var(--color-bg);
+  border-radius: var(--border-radius-sm);
+}
+
+.binding-item.editing {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-radius: var(--border-radius-sm);
+}
+
+.key-label {
+  min-width: 60px;
+  text-align: center;
+  background: var(--color-bg);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  font-family: monospace;
+  font-weight: 700;
 }
 </style>

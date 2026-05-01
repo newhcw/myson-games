@@ -27,6 +27,28 @@ export interface ScopeProgress {
   unlockedScopes: string[]
 }
 
+/**
+ * 游戏存档数据结构
+ */
+export interface GameSaveData {
+  timestamp: number  // 存档时间戳
+  player: {
+    health: number
+    position: { x: number; y: number; z: number }
+    rotation: { yaw: number; pitch: number }
+  }
+  game: {
+    score: number
+    kills: number
+    gameTime: number
+    state: 'playing' | 'paused' | 'idle'
+  }
+  weapon: {
+    currentIndex: number
+    ammo: Record<string, { current: number; reserve: number }>
+  }
+}
+
 export interface GameProgress {
   totalKills: number
   totalScore: number
@@ -146,6 +168,41 @@ export class StorageManager {
 
   async saveProgress(progress: GameProgress): Promise<boolean> {
     return localStorage$.set(STORAGE_KEYS.PROGRESS, progress)
+  }
+
+  // ===== Game Save/Load =====
+
+  /**
+   * 保存游戏存档
+   */
+  async saveGame(saveData: GameSaveData): Promise<boolean> {
+    return localStorage$.set(STORAGE_KEYS.SAVE, saveData)
+  }
+
+  /**
+   * 读取游戏存档
+   */
+  loadGame(): GameSaveData | null {
+    return localStorage$.get<GameSaveData>(STORAGE_KEYS.SAVE, null)
+  }
+
+  /**
+   * 检查是否有存档
+   */
+  hasSave(): boolean {
+    try {
+      const save = this.loadGame()
+      return save !== null
+    } catch {
+      return false
+    }
+  }
+
+  /**
+   * 删除游戏存档
+   */
+  async deleteSave(): Promise<boolean> {
+    return localStorage$.remove(STORAGE_KEYS.SAVE)
   }
 
   // ===== Update operations =====

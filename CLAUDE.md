@@ -13,6 +13,7 @@
   - `design.md`：技术决策和架构设计
   - `specs/`：各能力的详细规格说明
   - `tasks.md`：实现任务列表
+- **apps/frontend** 前端代码
 
 ## 技术栈
 
@@ -22,7 +23,6 @@
 - **路由**：Vue Router
 - **存储**：localStorage + IndexedDB（无后端）
 - **3D 模型**：glTF/GLB 格式
-
 
 # 目录结构
 

@@ -270,4 +270,101 @@ export class GamePage {
     const deathScreen = this.page.locator('.death-screen')
     await deathScreen.waitFor({ state: 'visible', timeout: 10000 })
   }
+
+  // ===== 波次系统测试 API =====
+
+  /**
+   * 获取当前波次
+   */
+  async getCurrentWave(): Promise<number> {
+    return await this.page.evaluate(() => {
+      const testApi = (window as any).__testApi
+      return testApi?.getCurrentWave?.() ?? 1
+    })
+  }
+
+  /**
+   * 获取波次状态 (waving / intermission / victory)
+   */
+  async getWaveState(): Promise<string> {
+    return await this.page.evaluate(() => {
+      const testApi = (window as any).__testApi
+      return testApi?.getWaveState?.() ?? 'waving'
+    })
+  }
+
+  /**
+   * 获取波次 HUD 文字
+   */
+  async getWaveDisplayText(): Promise<string> {
+    const waveDisplay = this.page.locator('.wave-display .wave-text')
+    return await waveDisplay.textContent() || ''
+  }
+
+  /**
+   * 检查波次间歇倒计时是否可见
+   */
+  async isIntermissionCountdownVisible(): Promise<boolean> {
+    const countdown = this.page.locator('.wave-intermission')
+    return await countdown.isVisible().catch(() => false)
+  }
+
+  /**
+   * 获取间歇倒计时数字
+   */
+  async getIntermissionCountdownNumber(): Promise<number> {
+    const countdown = this.page.locator('.wave-intermission .intermission-countdown')
+    const text = await countdown.textContent() || '0'
+    return parseInt(text, 10) || 0
+  }
+
+  /**
+   * 跳过间歇
+   */
+  async skipIntermission() {
+    await this.page.keyboard.press('Space')
+    await this.page.waitForTimeout(500)
+  }
+
+  /**
+   * 获取活跃 Buff 数量
+   */
+  async getActiveBuffCount(): Promise<number> {
+    const buffIcons = this.page.locator('.buff-icon')
+    return await buffIcons.count()
+  }
+
+  /**
+   * 检查是否存在双倍伤害 Buff
+   */
+  async hasDoubleDamageBuff(): Promise<boolean> {
+    const buff = this.page.locator('.buff-icon[data-buff-type="doubleDamage"]')
+    return await buff.isVisible().catch(() => false)
+  }
+
+  /**
+   * 等待通关界面出现
+   */
+  async waitForVictoryScreen() {
+    const victory = this.page.locator('.victory-screen')
+    await victory.waitFor({ state: 'visible', timeout: 120000 })
+  }
+
+  /**
+   * 检查通关界面是否可见
+   */
+  async isVictoryScreenVisible(): Promise<boolean> {
+    const victory = this.page.locator('.victory-screen')
+    return await victory.isVisible().catch(() => false)
+  }
+
+  /**
+   * 获取道具数量（通过测试 API）
+   */
+  async getPowerUpCount(): Promise<number> {
+    return await this.page.evaluate(() => {
+      const testApi = (window as any).__testApi
+      return testApi?.getPowerUpCount?.() ?? 0
+    })
+  }
 }

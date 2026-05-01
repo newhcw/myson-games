@@ -22,6 +22,15 @@
           <span class="button-text">开始游戏</span>
         </button>
 
+        <!-- 继续游戏按钮（仅在存在存档时显示） -->
+        <button
+          v-if="hasSave"
+          class="menu-button continue-button"
+          @click="continueGame"
+        >
+          <span class="button-text">继续游戏</span>
+        </button>
+
         <button
           class="menu-button settings-button"
           @click="showSettings"
@@ -43,13 +52,27 @@
 <script setup>
 
 import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { storageManager } from '@/game/storage/StorageManager'
 
 const router = useRouter()
+const hasSave = ref(false)
+
+onMounted(() => {
+  // 检查是否有存档
+  hasSave.value = storageManager.hasSave()
+})
 
 const startGame = () => {
   console.log('开始游戏')
   // 实现游戏开始逻辑
    router.push('/game') // 跳转到 FPS 游戏
+}
+
+const continueGame = () => {
+  console.log('继续游戏')
+  // 传递参数表示要加载存档
+  router.push({ path: '/game', query: { continue: 'true' } })
 }
 
 const showSettings = () => {
@@ -170,6 +193,12 @@ const exitGame = () => {
   color: #333;
   border: 3px solid #FFB347;
   font-weight: bold;
+}
+
+.continue-button {
+  background: linear-gradient(135deg, #34C759, #30D158);
+  color: white;
+  border: 3px solid #28A745;
 }
 
 .button-text {
