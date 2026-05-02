@@ -21,6 +21,8 @@ export class EnemyHealthBar {
     switch (type) {
       case 'boss': return { text: 'BOSS', color: '#FF4444' }
       case 'elite': return { text: '精英', color: '#BB86FC' }
+      case 'exploder': return { text: '自爆兵', color: '#FF8C00' }
+      case 'healer': return { text: '治疗者', color: '#2ECC71' }
       default: return { text: '小兵', color: '#64B5F6' }
     }
   }
@@ -78,6 +80,90 @@ export class EnemyHealthBar {
 
     wrapper.appendChild(healthText)
 
+    // BOSS狂暴阶段文字（默认隐藏）
+    let bossPhaseText: HTMLDivElement | undefined
+    if (enemy.config.type === 'boss') {
+      bossPhaseText = document.createElement('div')
+      bossPhaseText.textContent = '💫 狂暴!'
+      bossPhaseText.style.fontSize = '14px'
+      bossPhaseText.style.fontWeight = 'bold'
+      bossPhaseText.style.color = '#FF4444'
+      bossPhaseText.style.textShadow = '0 0 6px rgba(255,68,68,0.8)'
+      bossPhaseText.style.marginTop = '2px'
+      bossPhaseText.style.display = 'none' // 默认隐藏
+      bossPhaseText.style.animation = 'bossPhaseFlash 0.5s infinite alternate'
+      wrapper.appendChild(bossPhaseText)
+
+      // 添加闪烁动画样式（如果尚未添加）
+      if (!document.getElementById('boss-phase-style')) {
+        const style = document.createElement('style')
+        style.id = 'boss-phase-style'
+        style.textContent = `
+          @keyframes bossPhaseFlash {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0.4; transform: scale(1.05); }
+          }
+        `
+        document.head.appendChild(style)
+      }
+    }
+
+    // 冷却进度条（仅精英和BOSS）
+    let cooldownBar: HTMLDivElement | undefined
+    let cooldownFill: HTMLDivElement | undefined
+    if (enemy.config.type === 'elite' || enemy.config.type === 'boss') {
+      const cdBar = document.createElement('div')
+      cdBar.style.width = enemy.config.type === 'boss' ? '90px' : '72px'
+      cdBar.style.height = '4px'
+      cdBar.style.backgroundColor = 'rgba(0, 0, 0, 0.3)'
+      cdBar.style.borderRadius = '2px'
+      cdBar.style.overflow = 'hidden'
+      cdBar.style.marginTop = '2px'
+      cdBar.style.display = 'none' // 默认隐藏
+
+      const cdFill = document.createElement('div')
+      cdFill.style.width = '0%'
+      cdFill.style.height = '100%'
+      cdFill.style.transition = 'width 0.1s linear'
+      cdFill.style.borderRadius = '2px'
+      // 精英红色，BOSS黄色
+      cdFill.style.backgroundColor = enemy.config.type === 'boss' ? '#FFD700' : '#FF4444'
+
+      cdBar.appendChild(cdFill)
+      wrapper.appendChild(cdBar)
+
+      cooldownBar = cdBar
+      cooldownFill = cdFill
+    }
+
+    // 自爆兵预警闪烁效果（默认隐藏）
+    let exploderWarning: HTMLDivElement | undefined
+    if (enemy.config.type === 'exploder') {
+      exploderWarning = document.createElement('div')
+      exploderWarning.textContent = '⚠️ 警告!'
+      exploderWarning.style.fontSize = '11px'
+      exploderWarning.style.fontWeight = 'bold'
+      exploderWarning.style.color = '#FF4400'
+      exploderWarning.style.textShadow = '0 0 4px rgba(255,68,0,0.8)'
+      exploderWarning.style.marginTop = '2px'
+      exploderWarning.style.display = 'none' // 默认隐藏
+      exploderWarning.style.animation = 'exploderFlash 0.3s infinite alternate'
+      wrapper.appendChild(exploderWarning)
+
+      // 添加闪烁动画样式（如果尚未添加）
+      if (!document.getElementById('exploder-warning-style')) {
+        const style = document.createElement('style')
+        style.id = 'exploder-warning-style'
+        style.textContent = `
+          @keyframes exploderFlash {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0.3; transform: scale(1.1); }
+          }
+        `
+        document.head.appendChild(style)
+      }
+    }
+
     this.container.appendChild(wrapper)
 
     return {
@@ -86,7 +172,12 @@ export class EnemyHealthBar {
       fill,
       healthText,
       typeLabel,
-      visible: false
+      visible: false,
+      bossPhaseText,
+      lastPhaseFlash: 0,
+      cooldownBar,
+      cooldownFill,
+      exploderWarning,
     }
   }
 
@@ -153,6 +244,40 @@ export class EnemyHealthBar {
         // 更新血量文字
         healthBar.healthText.textContent = `${enemy.health}/${enemy.maxHealth}`
 
+        // BOSS狂暴阶段效果
+        if (enemy.config.type === 'boss' && enemy.phase === 2) {
+          // 血条边框变红闪烁
+          healthBar.fill.style.border = '2px solid #FF4444'
+          healthBar.fill.style.boxShadow = '0 0 8px rgba(255,68,68,0.8)'
+          // 显示狂暴文字
+          if (healthBar.bossPhaseText) {
+            healthBar.bossPhaseText.style.display = 'block'
+          }
+        } else {
+          // 恢复正常样式
+          healthBar.fill.style.border = 'none'
+          healthBar.fill.style.boxShadow = '0 1px 3px rgba(0,0,0,0.3)'
+          if (healthBar.bossPhaseText) {
+            healthBar.bossPhaseText.style.display = 'none'
+          }
+        }
+
+        // 自爆兵预警效果
+        if (enemy.config.type === 'exploder' && enemy.isExploding) {
+          // 血条闪烁红色警告
+          const flash = Math.sin(Date.now() * 0.01) * 0.5 + 0.5
+          healthBar.fill.style.backgroundColor = flash > 0.5 ? '#FF4400' : '#FF8C00'
+          healthBar.fill.style.boxShadow = '0 0 8px rgba(255,68,0,0.8)'
+          // 显示预警文字
+          if (healthBar.exploderWarning) {
+            healthBar.exploderWarning.style.display = 'block'
+          }
+        } else {
+          if (healthBar.exploderWarning) {
+            healthBar.exploderWarning.style.display = 'none'
+          }
+        }
+
         // 根据距离和敌人体型调整大小
         const distance = this.camera.position.distanceTo(enemy.position)
         const baseScale = Math.max(0.6, Math.min(1.2, 25 / distance))
@@ -168,6 +293,46 @@ export class EnemyHealthBar {
     } else {
       healthBar.wrapper.style.display = 'none'
       healthBar.visible = false
+    }
+  }
+
+
+  // 更新冷却进度条
+  private updateCooldownBar(enemy: Enemy, bar: HealthBarElement): void {
+    if (!bar.cooldownBar || !bar.cooldownFill) return
+
+    const now = Date.now()
+    let showBar = false
+    let progress = 0
+
+    // 精英蓄力攻击
+    if (enemy.config.type === 'elite' && enemy.isCharging) {
+      showBar = true
+      const elapsed = now - enemy.chargeStartTime
+      progress = Math.min(elapsed / 1500, 1) // 1.5秒蓄力
+      bar.cooldownFill.style.backgroundColor = '#FF4444' // 红色
+    }
+
+    // BOSS 大招冷却
+    if (enemy.config.type === 'boss' && enemy.config.specialAttack) {
+      const cooldown = enemy.phase === 2
+        ? enemy.config.specialAttack.cooldown * 0.5
+        : enemy.config.specialAttack.cooldown
+      if (now - enemy.lastSpecialAttackTime < cooldown) {
+        showBar = true
+        progress = Math.min((now - enemy.lastSpecialAttackTime) / cooldown, 1)
+        // 狂暴阶段冷却条变红，否则黄色
+        bar.cooldownFill.style.backgroundColor = enemy.phase === 2 ? '#FF4444' : '#FFD700'
+        // 狂暴阶段加快动画速度
+        bar.cooldownFill.style.transition = enemy.phase === 2 ? 'width 0.05s linear' : 'width 0.1s linear'
+      }
+    }
+
+    if (showBar && progress > 0) {
+      bar.cooldownBar.style.display = 'block'
+      bar.cooldownFill.style.width = `${progress * 100}%`
+    } else {
+      bar.cooldownBar.style.display = 'none'
     }
   }
 
@@ -274,4 +439,9 @@ interface HealthBarElement {
   typeLabel: HTMLDivElement
   visible: boolean
   screenY: number   // 缓存屏幕 Y 坐标，用于重叠检测
+  bossPhaseText?: HTMLDivElement  // BOSS狂暴阶段文字
+  lastPhaseFlash?: number  // 狂暴闪烁计时
+  cooldownBar?: HTMLDivElement  // 冷却进度条
+  cooldownFill?: HTMLDivElement  // 冷却进度条填充
+  exploderWarning?: HTMLDivElement  // 自爆兵预警文字
 }

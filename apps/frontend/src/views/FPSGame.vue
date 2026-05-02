@@ -404,37 +404,37 @@ const createObstacles = () => {
 
   // 障碍物预设：类型、位置、尺寸、颜色
   const obstaclePresets = [
-    // 大型障碍物（建筑/墙壁）
-    { type: 'box', size: [4, 3, 1], pos: [-12, 1.5, -8], color: 0x8B7355, castShadow: true },
-    { type: 'box', size: [1, 3, 4], pos: [12, 1.5, -6], color: 0x8B7355, castShadow: true },
-    { type: 'box', size: [6, 2, 1], pos: [0, 1, -15], color: 0x6B8E23, castShadow: true },
+    // 大型障碍物（建筑/墙壁）- 100HP
+    { type: 'box', size: [4, 3, 1], pos: [-12, 1.5, -8], color: 0x8B7355, castShadow: true, health: 100 },
+    { type: 'box', size: [1, 3, 4], pos: [12, 1.5, -6], color: 0x8B7355, castShadow: true, health: 100 },
+    { type: 'box', size: [6, 2, 1], pos: [0, 1, -15], color: 0x6B8E23, castShadow: true, health: 100 },
 
-    // 中型立方体
-    { type: 'box', size: [2, 2, 2], pos: [-5, 1, -5], color: 0x8B4513, castShadow: true },
-    { type: 'box', size: [2, 2, 2], pos: [5, 1, -8], color: 0xA0522D, castShadow: true },
-    { type: 'box', size: [2, 2, 2], pos: [-8, 1, 3], color: 0x8B4513, castShadow: true },
-    { type: 'box', size: [2, 2, 2], pos: [8, 1, 5], color: 0xA0522D, castShadow: true },
-    { type: 'box', size: [2, 2, 2], pos: [0, 1, -12], color: 0xCD853F, castShadow: true },
+    // 中型立方体 - 60HP
+    { type: 'box', size: [2, 2, 2], pos: [-5, 1, -5], color: 0x8B4513, castShadow: true, health: 60 },
+    { type: 'box', size: [2, 2, 2], pos: [5, 1, -8], color: 0xA0522D, castShadow: true, health: 60 },
+    { type: 'box', size: [2, 2, 2], pos: [-8, 1, 3], color: 0x8B4513, castShadow: true, health: 60 },
+    { type: 'box', size: [2, 2, 2], pos: [8, 1, 5], color: 0xA0522D, castShadow: true, health: 60 },
+    { type: 'box', size: [2, 2, 2], pos: [0, 1, -12], color: 0xCD853F, castShadow: true, health: 60 },
 
-    // 低矮障碍物（掩体）
-    { type: 'box', size: [3, 1, 1.5], pos: [-3, 0.5, 0], color: 0x708090, castShadow: true },
-    { type: 'box', size: [3, 1, 1.5], pos: [3, 0.5, 2], color: 0x708090, castShadow: true },
-    { type: 'box', size: [1.5, 1, 3], pos: [0, 0.5, 5], color: 0x778899, castShadow: true },
+    // 低矮障碍物（掩体）- 60HP
+    { type: 'box', size: [3, 1, 1.5], pos: [-3, 0.5, 0], color: 0x708090, castShadow: true, health: 60 },
+    { type: 'box', size: [3, 1, 1.5], pos: [3, 0.5, 2], color: 0x708090, castShadow: true, health: 60 },
+    { type: 'box', size: [1.5, 1, 3], pos: [0, 0.5, 5], color: 0x778899, castShadow: true, health: 60 },
 
-    // 圆柱形障碍物
-    { type: 'cylinder', size: [0.8, 0.8, 3, 16], pos: [-10, 1.5, 0], color: 0x4682B4, castShadow: true },
-    { type: 'cylinder', size: [0.8, 0.8, 3, 16], pos: [10, 1.5, -2], color: 0x4682B4, castShadow: true },
-    { type: 'cylinder', size: [1.2, 1.2, 2, 16], pos: [15, 1, 8], color: 0x5F9EA0, castShadow: true },
+    // 圆柱形障碍物 - 60HP
+    { type: 'cylinder', size: [0.8, 0.8, 3, 16], pos: [-10, 1.5, 0], color: 0x4682B4, castShadow: true, health: 60 },
+    { type: 'cylinder', size: [0.8, 0.8, 3, 16], pos: [10, 1.5, -2], color: 0x4682B4, castShadow: true, health: 60 },
+    { type: 'cylinder', size: [1.2, 1.2, 2, 16], pos: [15, 1, 8], color: 0x5F9EA0, castShadow: true, health: 60 },
 
-    // 小型装饰物
-    { type: 'box', size: [1, 1, 1], pos: [-15, 0.5, 5], color: 0xDEB887, castShadow: true },
-    { type: 'box', size: [1, 1, 1], pos: [15, 0.5, -10], color: 0xDEB887, castShadow: true },
-    { type: 'box', size: [1.5, 0.5, 1.5], pos: [-6, 0.25, 8], color: 0x2E8B57, castShadow: false },
-    { type: 'box', size: [1.5, 0.5, 1.5], pos: [7, 0.25, -15], color: 0x2E8B57, castShadow: false },
+    // 小型装饰物 - 30HP
+    { type: 'box', size: [1, 1, 1], pos: [-15, 0.5, 5], color: 0xDEB887, castShadow: true, health: 30 },
+    { type: 'box', size: [1, 1, 1], pos: [15, 0.5, -10], color: 0xDEB887, castShadow: true, health: 30 },
+    { type: 'box', size: [1.5, 0.5, 1.5], pos: [-6, 0.25, 8], color: 0x2E8B57, castShadow: false, health: 30 },
+    { type: 'box', size: [1.5, 0.5, 1.5], pos: [7, 0.25, -15], color: 0x2E8B57, castShadow: false, health: 30 },
 
-    // 中央区域障碍物
-    { type: 'box', size: [2, 1.5, 2], pos: [-2, 0.75, -3], color: 0xB8860B, castShadow: true },
-    { type: 'box', size: [2, 1.5, 2], pos: [2, 0.75, -4], color: 0xB8860B, castShadow: true },
+    // 中央区域障碍物 - 60HP
+    { type: 'box', size: [2, 1.5, 2], pos: [-2, 0.75, -3], color: 0xB8860B, castShadow: true, health: 60 },
+    { type: 'box', size: [2, 1.5, 2], pos: [2, 0.75, -4], color: 0xB8860B, castShadow: true, health: 60 },
   ]
 
   obstaclePresets.forEach((preset) => {
@@ -459,8 +459,8 @@ const createObstacles = () => {
     mesh.receiveShadow = true
     scene!.add(mesh)
 
-    // 添加碰撞体
-    collisionDetector.addCollider(mesh)
+    // 添加碰撞体（带血量，可被破坏）
+    collisionDetector.addCollider(mesh, preset.health)
   })
 }
 
@@ -1729,6 +1729,19 @@ onMounted(() => {
       return true
     },
 
+    // 生成测试敌人（指定类型，生成在玩家附近）
+    spawnTestEnemy: (type: string) => {
+      if (!enemyManagerRef.value) return -1
+      const pos = playerPosition.clone().add(new THREE.Vector3(5, 0, 0))
+      const enemy = enemyManagerRef.value.spawnTestEnemy(type, pos)
+      if (enemy && enemy.mesh) {
+        enemy.mesh.lookAt(playerPosition.x, enemy.mesh.position.y, playerPosition.z)
+        enemy.state = 'chase'
+      }
+      const enemies = enemyManagerRef.value.getActiveEnemies()
+      return enemies.findIndex((e: any) => e.id === enemy.id)
+    },
+
     // ===== RPG 武器测试 API =====
 
     // 切换到 RPG 武器（索引 5）
@@ -1747,6 +1760,11 @@ onMounted(() => {
       const ammoData = weaponStore.ammo.get('rpg')
       if (!ammoData) return null
       return { current: ammoData.current, reserve: ammoData.reserve }
+    },
+
+    // 获取活跃火箭数量
+    getActiveRocketCount: () => {
+      return rocketManager?.getActiveRockets?.()?.length ?? 0
     },
 
     // 获取血条屏幕坐标（用于验证血条不重叠）

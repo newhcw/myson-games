@@ -1,15 +1,47 @@
 import * as THREE from 'three'
 
+// 障碍物数据接口
+export interface ObstacleData {
+  id: string
+  mesh: THREE.Mesh
+  health: number
+  maxHealth: number
+  isDestroyed: boolean
+}
+
 export class CollisionDetector {
   private colliders: THREE.Box3[] = []
+  private obstacleMap: Map<string, ObstacleData> = new Map()
 
-  addCollider(mesh: THREE.Mesh) {
+  addCollider(mesh: THREE.Mesh, health?: number) {
     const box = new THREE.Box3().setFromObject(mesh)
     this.colliders.push(box)
+
+    // 如果指定了血量，注册为可破坏障碍物
+    if (health !== undefined) {
+      const obstacleData: ObstacleData = {
+        id: mesh.uuid,
+        mesh,
+        health,
+        maxHealth: health,
+        isDestroyed: false,
+      }
+      this.obstacleMap.set(mesh.uuid, obstacleData)
+      // 在 mesh.userData 中存储引用
+      mesh.userData = mesh.userData || {}
+      mesh.userData.obstacleData = obstacleData
+    }
   }
 
   removeAllColliders() {
     this.colliders = []
+    this.obstacleMap.clear()
+  }
+
+  // 移除指定障碍物
+  removeCollider(meshUuid: string) {
+    this.obstacleMap.delete(meshUuid)
+    // 注意：colliders 数组中的 Box3 不会自动移除，但被破坏的障碍物 mesh 会被移除
   }
 
   checkCollision(position: THREE.Vector3, radius: number = 0.5): boolean {
@@ -24,6 +56,40 @@ export class CollisionDetector {
       }
     }
     return false
+  }
+
+  // 对位置附近的障碍物造成伤害
+  takeDamageAtPosition(position: THREE.Vector3, damage: number): { destroyed: boolean; obstacle: ObstacleData | null } {
+    const radius = 1.0 // 1米范围内检测
+
+    for (const [uuid, obstacle] of this.obstacleMap) {
+      if (obstacle.isDestroyed) continue
+
+      const distance = obstacle.mesh.position.distanceTo(position)
+      if (distance <= radius) {
+        obstacle.health -= damage
+        if (obstacle.health <= 0) {
+          obstacle.health = 0
+          obstacle.isDestroyed = true
+          return { destroyed: true, obstacle }
+        }
+        return { destroyed: false, obstacle }
+      }
+    }
+
+    return { destroyed: false, obstacle: null }
+  }
+
+  // 获取位置附近的障碍物
+  getObstacleAt(position: THREE.Vector3, radius: number = 1.0): ObstacleData | null {
+    for (const [uuid, obstacle] of this.obstacleMap) {
+      if (obstacle.isDestroyed) continue
+      const distance = obstacle.mesh.position.distanceTo(position)
+      if (distance <= radius) {
+        return obstacle
+      }
+    }
+    return null
   }
 
   // Placeholder for ray-based collision detection

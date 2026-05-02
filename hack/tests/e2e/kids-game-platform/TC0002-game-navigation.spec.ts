@@ -41,8 +41,8 @@ test.describe('游戏导航测试', () => {
     await expect(gamePage.weaponInfo).toBeVisible();
     await expect(gamePage.controlsHint).toBeVisible();
 
-    // 验证武器槽位显示
-    await expect(gamePage.weaponSlots).toHaveCount(5);
+    // 验证武器槽位显示（6个武器：手枪、冲锋枪、步枪、狙击枪、霰弹枪、火箭筒）
+    await expect(gamePage.weaponSlots).toHaveCount(6);
 
     // 验证控制提示文字
     await expect(gamePage.controlsHint).toContainText('WASD 移动');

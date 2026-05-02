@@ -14,12 +14,14 @@ export const WAVE_CONFIGS: WaveConfig[] = [
   { waveNumber:  1, enemies: [{ type: 'soldier', count: 3 }] },
   { waveNumber:  2, enemies: [{ type: 'soldier', count: 5 }] },
   { waveNumber:  3, enemies: [{ type: 'soldier', count: 4 }, { type: 'elite', count: 1 }] },
-  { waveNumber:  4, enemies: [{ type: 'soldier', count: 6 }, { type: 'elite', count: 2 }] },
+  // 第4波开始自爆兵
+  { waveNumber:  4, enemies: [{ type: 'exploder', count: 1 }, { type: 'soldier', count: 4 }] },
   { waveNumber:  5, enemies: [{ type: 'boss', count: 1 }, { type: 'soldier', count: 3 }], isBossWave: true },
-  { waveNumber:  6, enemies: [{ type: 'soldier', count: 8 }] },
-  { waveNumber:  7, enemies: [{ type: 'soldier', count: 5 }, { type: 'elite', count: 3 }] },
+  // 第6波开始治疗者
+  { waveNumber:  6, enemies: [{ type: 'healer', count: 1 }, { type: 'soldier', count: 5 }, { type: 'elite', count: 1 }] },
+  { waveNumber:  7, enemies: [{ type: 'exploder', count: 2 }, { type: 'elite', count: 3 }] },
   { waveNumber:  8, enemies: [{ type: 'soldier', count: 10 }] },
-  { waveNumber:  9, enemies: [{ type: 'elite', count: 4 }, { type: 'boss', count: 2 }] },
+  { waveNumber:  9, enemies: [{ type: 'healer', count: 2 }, { type: 'elite', count: 3 }, { type: 'boss', count: 2 }] },
   { waveNumber: 10, enemies: [{ type: 'boss', count: 2 }, { type: 'elite', count: 5 }], isBossWave: true },
 ]
 

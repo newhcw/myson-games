@@ -3,7 +3,7 @@
  */
 
 /** 敌人类型关键词 */
-export type EnemyTypeKeyword = 'soldier' | 'elite' | 'boss'
+export type EnemyTypeKeyword = 'soldier' | 'elite' | 'boss' | 'exploder' | 'healer'
 
 /** 单波敌人配置 */
 export interface WaveEnemyConfig {

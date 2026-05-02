@@ -144,6 +144,33 @@ const setOnEnemyKilled = (cb: (enemyId: string) => void): void => {
   onEnemyKilledCallback = cb
 }
 
+// 获取敌人冷却进度（用于 UI 显示）
+const getCooldownProgress = (enemy: any): { type: string; progress: number } | null => {
+  if (!enemy) return null
+
+  const now = Date.now()
+
+  // 精英蓄力攻击
+  if (enemy.config.type === 'elite' && enemy.isCharging) {
+    const elapsed = now - enemy.chargeStartTime
+    const progress = Math.min(elapsed / 1500, 1) // 1.5秒蓄力
+    return { type: 'charge', progress }
+  }
+
+  // BOSS 大招冷却
+  if (enemy.config.type === 'boss' && enemy.config.specialAttack) {
+    const cooldown = enemy.phase === 2 
+      ? enemy.config.specialAttack.cooldown * 0.5 
+      : enemy.config.specialAttack.cooldown
+    if (now - enemy.lastSpecialAttackTime < cooldown) {
+      const progress = Math.min((now - enemy.lastSpecialAttackTime) / cooldown, 1)
+      return { type: 'special', progress }
+    }
+  }
+
+  return null
+}
+
 onMounted(() => {
   if (props.scene && props.camera) {
     const enemyGroup = new THREE.Group()
@@ -203,6 +230,12 @@ defineExpose({
   getProjectileManager: () => projectileManager,
   getActiveProjectileCount: () => projectileManager?.getActiveCount() || 0,
   getPowerUpManager: () => powerUpManager,
+  spawnTestEnemy: (type: EnemyTypeKeyword, position: THREE.Vector3) => {
+    const enemy = enemyAI.spawnEnemy(type, position)
+    enemies.push(enemy.id)
+    enemyTypes.set(enemy.id, type)
+    return enemy
+  },
 })
 </script>
 

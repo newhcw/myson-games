@@ -30,23 +30,29 @@ test.describe('设置页面测试', () => {
   test('TC0008 - 设置页面应显示所有设置选项', async () => {
     await settingsPage.goto();
     await settingsPage.expectLoaded();
-    
+
     // 验证声音设置区域
     await expect(settingsPage.content.locator('h2').first()).toHaveText('声音设置');
     await expect(settingsPage.volumeSlider).toBeVisible();
-    
+
     // 验证游戏设置区域
     const gameSettingsTitle = settingsPage.content.locator('h2').nth(1);
     await expect(gameSettingsTitle).toHaveText('游戏设置');
     await expect(settingsPage.difficultySelect).toBeVisible();
     await expect(settingsPage.showDamageCheckbox).toBeVisible();
     await expect(settingsPage.autoAimCheckbox).toBeVisible();
-    
+
+    // 验证按键映射配置区域（新增）
+    const keyBindingTitle = settingsPage.content.locator('h2').nth(2);
+    await expect(keyBindingTitle).toHaveText('按键映射配置');
+
     // 验证数据管理区域
-    const dataManagementTitle = settingsPage.content.locator('h2').nth(2);
+    const dataManagementTitle = settingsPage.content.locator('h2').nth(3);
     await expect(dataManagementTitle).toHaveText('数据管理');
-    await expect(settingsPage.resetButton).toBeVisible();
-    
+    // 数据管理区域的重置按钮（.setting-group.danger 内的 .reset-btn）
+    const dataResetButton = settingsPage.content.locator('.setting-group.danger .reset-btn');
+    await expect(dataResetButton).toBeVisible();
+
     // 验证保存按钮
     await expect(settingsPage.saveButton).toBeVisible();
     await expect(settingsPage.saveButton).toHaveText('保存设置');

@@ -75,8 +75,33 @@ export class GamePage {
     // 等待加载界面消失
     await expect(this.loading).not.toBeVisible({ timeout: 30000 })
 
-    // 验证 HUD 可见
-    await expect(this.hud).toBeVisible()
+    // 验证 HUD 可见（增加重试逻辑）
+    await expect(this.hud).toBeVisible({ timeout: 10000 })
+  }
+
+  /**
+   * 获取所有敌人（简化版，避免序列化问题）
+   */
+  async getEnemiesSimple() {
+    // 等待游戏加载完成
+    await this.expectLoaded()
+
+    // 通过测试API获取敌人信息（只获取基本属性）
+    return await this.page.evaluate(() => {
+      const testApi = window.__testApi
+      if (testApi && testApi.getEnemies) {
+        const enemies = testApi.getEnemies()
+        // 只返回可序列化的基本属性
+        return enemies.map((e: any) => ({
+          id: e.id,
+          type: e.type,
+          health: e.health,
+          isDead: e.isDead,
+          state: e.state,
+        }))
+      }
+      return []
+    })
   }
 
   /**

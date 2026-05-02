@@ -1,9 +1,8 @@
 import * as THREE from 'three'
-import type { Enemy } from './types'
+import type { Enemy, ShootResult } from './types'
+import { collisionDetector } from '@/game/utils/Collision'
 
-/**
- * 敌人射击配置
- */
+// 敌人射击配置
 export const ENEMY_SHOOT_CONFIG = {
   // 射击间隔（毫秒）
   attackInterval: 1000,
@@ -15,13 +14,16 @@ export const ENEMY_SHOOT_CONFIG = {
   effectiveAngle: 30,
 }
 
-/**
- * 射击结果
- */
-export interface ShootResult {
-  hit: boolean       // 是否命中
-  damage: number     // 造成的伤害
-  enemy: Enemy       // 射击的敌人
+// 障碍物接口（用于类型检查）
+interface ObstacleMesh extends THREE.Mesh {
+  userData: {
+    obstacleData?: {
+      id: string
+      health: number
+      maxHealth: number
+      isDestroyed: boolean
+    }
+  }
 }
 
 /**
@@ -141,6 +143,56 @@ export class EnemyShooter {
     }
 
     return false
+  }
+
+  /**
+   * 查找攻击目标（优先玩家，若被遮挡则攻击障碍物）
+   * @param enemy 敌人
+   * @param playerPosition 玩家位置
+   * @param obstacles 障碍物网格数组
+   * @returns 攻击目标信息
+   */
+  findTargetToAttack(
+    enemy: Enemy,
+    playerPosition: THREE.Vector3,
+    obstacles: THREE.Mesh[]
+  ): { type: 'player' | 'obstacle'; position: THREE.Vector3; obstacle?: any } | null {
+    // 先检测是否可以射击玩家
+    if (this.canShoot(enemy, playerPosition)) {
+      return { type: 'player', position: playerPosition }
+    }
+
+    // 玩家被遮挡，尝试查找路径上的障碍物
+    const enemyPos = enemy.position.clone().add(new THREE.Vector3(0, 1, 0))
+    const directionToPlayer = new THREE.Vector3().subVectors(playerPosition, enemyPos).normalize()
+
+    this.raycaster.set(enemyPos, directionToPlayer)
+    this.raycaster.far = 10 // 检测前方10米
+
+    for (const obstacle of obstacles) {
+      const intersects = this.raycaster.intersectObject(obstacle, true)
+      if (intersects.length > 0) {
+        return { type: 'obstacle', position: obstacle.position.clone() }
+      }
+    }
+
+    return null
+  }
+
+  /**
+   * 对障碍物造成伤害（委托给 collisionDetector）
+   * @param position 伤害位置
+   * @param damage 伤害值
+   * @returns 破坏结果
+   */
+  damageObstacle(
+    position: THREE.Vector3,
+    damage: number
+  ): { destroyed: boolean; obstacle: any } {
+    if (collisionDetector) {
+      return collisionDetector.takeDamageAtPosition(position, damage)
+    }
+    return { destroyed: false, obstacle: null }
   }
 }
 

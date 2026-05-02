@@ -15,7 +15,7 @@ export interface SpecialAttackConfig {
 export interface EnemyConfig {
   id: string
   name: string
-  type: 'soldier' | 'elite' | 'boss'
+  type: 'soldier' | 'elite' | 'boss' | 'exploder' | 'healer'
   health: number
   moveSpeed: number
   viewDistance: number // 视野距离
@@ -31,6 +31,16 @@ export interface EnemyConfig {
   burstCount: number // 每次射击发射的子弹数
   // BOSS 专属
   specialAttack?: SpecialAttackConfig // 特殊攻击配置
+  // 阶段转换倍率（BOSS）
+  phase2Multiplier?: number // 狂暴阶段属性倍率
+  // 自爆兵专属
+  explosionRadius?: number // 爆炸半径
+  explosionTriggerDistance?: number // 触发爆炸距离
+  explosionWarningDuration?: number // 预警时间（毫秒）
+  // 治疗者专属
+  healAmount?: number // 治疗量
+  healRadius?: number // 治疗范围
+  healInterval?: number // 治疗间隔（毫秒）
 }
 
 // 敌人配置
@@ -85,6 +95,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     attackInterval: 1000, // 每秒一发
     projectileVisual: 'fireball', // 大火球
     burstCount: 1,
+    phase2Multiplier: 1.5, // 狂暴阶段倍率
     specialAttack: {
       type: 'fan',
       projectileCount: 6, // 6发弹幕
@@ -92,6 +103,46 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
       cooldown: 8000, // 8秒冷却
       warningDuration: 2000, // 2秒预警
     },
+  },
+  exploder: {
+    id: 'exploder',
+    name: '自爆兵',
+    type: 'exploder',
+    health: 80,
+    moveSpeed: 6,
+    viewDistance: 12,
+    viewAngle: Math.PI, // 360度
+    patrolRadius: 8,
+    damage: 40,
+    scoreValue: 150,
+    projectileSpeed: 0, // 不射击
+    projectileSpread: 0,
+    attackInterval: 0, // 不自瞄射击
+    projectileVisual: 'fireball',
+    burstCount: 0,
+    explosionRadius: 3,
+    explosionTriggerDistance: 2,
+    explosionWarningDuration: 1000, // 1秒预警
+  },
+  healer: {
+    id: 'healer',
+    name: '治疗者',
+    type: 'healer',
+    health: 60,
+    moveSpeed: 2,
+    viewDistance: 25,
+    viewAngle: Math.PI * 2, // 360度
+    patrolRadius: 6,
+    damage: 0, // 不造成伤害
+    scoreValue: 200,
+    projectileSpeed: 0,
+    projectileSpread: 0,
+    attackInterval: 0,
+    projectileVisual: 'star',
+    burstCount: 0,
+    healAmount: 20,
+    healRadius: 8,
+    healInterval: 3000, // 3秒
   },
 }
 
@@ -122,6 +173,13 @@ export interface Enemy {
   lastSpecialAttackTime: number
   // BOSS 大招预警特效
   warningRing: THREE.Mesh | null
+  // BOSS 阶段转换
+  phase: number // 1=正常，2=狂暴
+  // 自爆兵
+  isExploding: boolean // 是否正在预警
+  explosionStartTime: number // 开始预警的时间
+  // 治疗者
+  lastHealTime: number // 上次治疗时间
 }
 
 // 敌人管理

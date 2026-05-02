@@ -18,6 +18,16 @@ const ENEMY_COLORS = {
     head: 0xffd1dc,
     accent: 0xc0392b,
   },
+  exploder: {
+    body: 0xff8c00, // 橙色
+    head: 0x222222, // 黑色头部
+    accent: 0xcc7000,
+  },
+  healer: {
+    body: 0x2ecc71, // 绿色
+    head: 0xffd1dc,
+    accent: 0x27ae60,
+  },
 }
 
 // 体型缩放比例
@@ -25,6 +35,8 @@ const ENEMY_SCALE = {
   soldier: 1.0,
   elite: 1.5,
   boss: 2.0,
+  exploder: 0.9, // 自爆兵较小
+  healer: 1.1, // 治疗者略大
 }
 
 // 创建Q版敌人3D模型
@@ -229,6 +241,58 @@ export function createEnemyMesh(config: EnemyConfig): THREE.Group {
     group.userData.bossRing = ring
   }
 
+  // ========== 自爆兵红色脉冲光晕 ==========
+  if (config.type === 'exploder') {
+    const pulseGeom = new THREE.SphereGeometry(0.6 * scale, 8, 8)
+    const pulseMat = new THREE.MeshBasicMaterial({
+      color: 0xff3300,
+      transparent: true,
+      opacity: 0.4,
+    })
+    const pulseGlow = new THREE.Mesh(pulseGeom, pulseMat)
+    pulseGlow.position.y = 0.5 * scale
+    group.add(pulseGlow)
+
+    // 红色粒子环
+    const ringGeom = new THREE.TorusGeometry(0.5 * scale, 0.04 * scale, 8, 16)
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0xff0000,
+      transparent: true,
+      opacity: 0.6,
+    })
+    const ring = new THREE.Mesh(ringGeom, ringMat)
+    ring.rotation.x = -Math.PI / 2
+    ring.position.y = 0.5 * scale
+    group.add(ring)
+
+    group.userData.exploderPulse = pulseGlow
+    group.userData.exploderRing = ring
+  }
+
+  // ========== 治疗者绿色光晕 ==========
+  if (config.type === 'healer') {
+    const healGeom = new THREE.SphereGeometry(0.5 * scale, 8, 8)
+    const healMat = new THREE.MeshBasicMaterial({
+      color: 0x00ff88,
+      transparent: true,
+      opacity: 0.3,
+    })
+    const healGlow = new THREE.Mesh(healGeom, healMat)
+    healGlow.position.y = 0.5 * scale
+    group.add(healGlow)
+
+    // 白色十字标记
+    const crossMat = new THREE.MeshBasicMaterial({ color: 0xffffff })
+    const vBar = new THREE.Mesh(new THREE.BoxGeometry(0.08 * scale, 0.3 * scale, 0.05), crossMat)
+    vBar.position.y = 1.3 * scale
+    group.add(vBar)
+    const hBar = new THREE.Mesh(new THREE.BoxGeometry(0.3 * scale, 0.08 * scale, 0.05), crossMat)
+    hBar.position.y = 1.3 * scale
+    group.add(hBar)
+
+    group.userData.healerGlow = healGlow
+  }
+
   // 存储对各部分的引用以便动画使用
   group.userData = {
     ...group.userData,
@@ -260,6 +324,21 @@ export function updateBossEffects(enemy: Enemy, time: number): void {
 
   const particles = enemy.mesh.userData.bossParticles as THREE.Mesh[] | undefined
   const ring = enemy.mesh.userData.bossRing as THREE.Mesh | undefined
+  const isBerserk = enemy.phase === 2
+
+  // 狂暴阶段身体颜色渐变
+  if (isBerserk) {
+    const body = enemy.mesh.userData.body as THREE.Mesh | undefined
+    if (body) {
+      const material = body.material as THREE.MeshToonMaterial
+      // 计算血量百分比（0-50%映射到1-0）
+      const healthPercent = enemy.health / (enemy.maxHealth * 0.5)
+      const r = 0x8B + (0xFF - 0x8B) * (1 - healthPercent)
+      const g = 0x00
+      const b = 0x00
+      material.color.setHex((Math.floor(r) << 16) | b)
+    }
+  }
 
   if (particles) {
     for (const particle of particles) {
@@ -272,14 +351,48 @@ export function updateBossEffects(enemy: Enemy, time: number): void {
       // 粒子脉冲大小
       const pulseScale = 0.8 + Math.sin(time * 3 + p.__orbitAngle) * 0.2
       particle.scale.setScalar(pulseScale)
+
+      // 狂暴阶段粒子颜色变红紫混合
+      if (isBerserk) {
+        const mat = particle.material as THREE.MeshBasicMaterial
+        const t = (Math.sin(time * 2 + p.__orbitAngle) + 1) * 0.5
+        mat.color.setHex(t > 0.5 ? 0xFF00FF : 0xFF4444) // 红紫色混合
+      }
     }
   }
 
   if (ring) {
+    // 狂暴阶段光环旋转加快
+    const rotationSpeed = isBerserk ? 0.03 : 0.01
     // 光环脉冲透明度
-    const ringOpacity = 0.3 + Math.sin(time * 2) * 0.2
+    const ringOpacity = isBerserk
+      ? 0.5 + Math.sin(time * 3) * 0.3
+      : 0.3 + Math.sin(time * 2) * 0.2
     ;(ring.material as THREE.MeshBasicMaterial).opacity = ringOpacity
-    ring.rotation.z += 0.01
+    ring.rotation.z += rotationSpeed
+
+    // 狂暴阶段新增红色火焰环特效
+    if (isBerserk && !enemy.mesh.userData.flameRing) {
+      const flameGeom = new THREE.TorusGeometry(1.3, 0.08, 8, 24)
+      const flameMat = new THREE.MeshBasicMaterial({
+        color: 0xFF3333,
+        transparent: true,
+        opacity: 0.7,
+      })
+      const flameRing = new THREE.Mesh(flameGeom, flameMat)
+      flameRing.rotation.x = -Math.PI / 2
+      flameRing.position.y = -0.2
+      enemy.mesh.add(flameRing)
+      enemy.mesh.userData.flameRing = flameRing
+    }
+
+    // 更新火焰环动画
+    const flameRing = enemy.mesh.userData.flameRing as THREE.Mesh | undefined
+    if (flameRing) {
+      flameRing.rotation.z += 0.05
+      const flameOpacity = 0.5 + Math.sin(time * 4) * 0.3
+      ;(flameRing.material as THREE.MeshBasicMaterial).opacity = flameOpacity
+    }
   }
 }
 
@@ -410,4 +523,116 @@ export function playDeathAnimation(enemy: Enemy, onComplete?: () => void): void 
   }
 
   fadeOut()
+}
+
+// 自爆兵预警动画
+export function updateExploderEffects(enemy: Enemy, time: number): void {
+  if (enemy.config.type !== 'exploder' || !enemy.mesh) return
+
+  const pulseGlow = enemy.mesh.userData.exploderPulse as THREE.Mesh | undefined
+  const ring = enemy.mesh.userData.exploderRing as THREE.Mesh | undefined
+  const body = enemy.mesh.userData.body as THREE.Mesh | undefined
+
+  // 预警阶段特效
+  if (enemy.isExploding) {
+    const t = (time * 5) % 1 // 快速闪烁
+    const flash = Math.sin(t * Math.PI * 2) * 0.5 + 0.5
+
+    // 脉冲光晕闪烁
+    if (pulseGlow) {
+      ;(pulseGlow.material as THREE.MeshBasicMaterial).opacity = 0.3 + flash * 0.6
+      const pulseScale = 1.0 + flash * 0.3
+      pulseGlow.scale.setScalar(pulseScale)
+    }
+
+    // 红色粒子环旋转加快
+    if (ring) {
+      ring.rotation.z += 0.08
+      ;(ring.material as THREE.MeshBasicMaterial).opacity = 0.4 + flash * 0.5
+    }
+
+    // 身体闪烁红色警告
+    if (body) {
+      const material = body.material as THREE.MeshToonMaterial
+      const r = flash > 0.5 ? 0xff3300 : 0xff8c00
+      material.color.setHex(r)
+    }
+  } else {
+    // 正常状态：缓慢脉冲
+    if (pulseGlow) {
+      const pulseOpacity = 0.3 + Math.sin(time * 2) * 0.15
+      ;(pulseGlow.material as THREE.MeshBasicMaterial).opacity = pulseOpacity
+      const pulseScale = 0.9 + Math.sin(time * 1.5) * 0.1
+      pulseGlow.scale.setScalar(pulseScale)
+    }
+
+    if (ring) {
+      ring.rotation.z += 0.02
+    }
+  }
+}
+
+// 治疗者特效动画
+export function updateHealerEffects(enemy: Enemy, time: number): void {
+  if (enemy.config.type !== 'healer' || !enemy.mesh) return
+
+  const healGlow = enemy.mesh.userData.healerGlow as THREE.Mesh | undefined
+  if (healGlow) {
+    const pulseOpacity = 0.2 + Math.sin(time * 1.5) * 0.15
+    ;(healGlow.material as THREE.MeshBasicMaterial).opacity = pulseOpacity
+    const pulseScale = 0.9 + Math.sin(time) * 0.1
+    healGlow.scale.setScalar(pulseScale)
+  }
+
+  // 治疗时的绿色粒子向上飘散
+  const healParticles = enemy.mesh.userData.healParticles as THREE.Mesh[] | undefined
+  if (healParticles) {
+    for (let i = healParticles.length - 1; i >= 0; i--) {
+      const p = healParticles[i]
+      // 向上飘散
+      p.position.y += 0.02
+      // 淡出
+      const mat = p.material as THREE.MeshBasicMaterial
+      mat.opacity! -= 0.02
+      if (mat.opacity! <= 0) {
+        enemy.mesh.remove(p)
+        p.geometry.dispose()
+        mat.dispose()
+        healParticles.splice(i, 1)
+      }
+    }
+    if (healParticles.length === 0) {
+      delete enemy.mesh.userData.healParticles
+    }
+  }
+}
+
+// 创建治疗粒子（由 EnemyAI 调用）
+export function createHealParticles(enemy: Enemy): void {
+  if (enemy.config.type !== 'healer' || !enemy.mesh) return
+
+  if (!enemy.mesh.userData.healParticles) {
+    enemy.mesh.userData.healParticles = []
+  }
+  const healParticles = enemy.mesh.userData.healParticles as THREE.Mesh[]
+
+  // 创建 3-5 个绿色粒子
+  const count = 3 + Math.floor(Math.random() * 3)
+  for (let i = 0; i < count; i++) {
+    const particleGeom = new THREE.SphereGeometry(0.05, 4, 4)
+    const particleMat = new THREE.MeshBasicMaterial({
+      color: 0x00ff88,
+      transparent: true,
+      opacity: 0.8,
+    })
+    const particle = new THREE.Mesh(particleGeom, particleMat)
+    // 随机位置（在治疗者周围）
+    particle.position.set(
+      (Math.random() - 0.5) * 0.8,
+      1.2 + Math.random() * 0.3,
+      (Math.random() - 0.5) * 0.8
+    )
+    enemy.mesh.add(particle)
+    healParticles.push(particle)
+  }
 }

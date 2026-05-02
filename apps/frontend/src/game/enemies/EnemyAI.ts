@@ -1,10 +1,11 @@
 import * as THREE from 'three'
 import type { Enemy } from './types'
 import { ENEMY_CONFIGS } from './types'
-import { createEnemyMesh, playIdleAnimation, playWalkAnimation, playChaseAnimation, playHitAnimation, playDeathAnimation, updateEnemyPosition, updateBossEffects } from './EnemyRenderer'
+import { createEnemyMesh, playIdleAnimation, playWalkAnimation, playChaseAnimation, playHitAnimation, playDeathAnimation, updateEnemyPosition, updateBossEffects, updateExploderEffects, updateHealerEffects, createHealParticles } from './EnemyRenderer'
 import { EnemyHealthBar } from './EnemyHealthBar'
 import { enemyShooter } from './EnemyShooter'
 import { ProjectileManager } from './ProjectileManager'
+import { collisionDetector } from '@/game/utils/Collision'
 
 export interface EnemyAIOptions {
   playerPosition: THREE.Vector3
@@ -46,6 +47,10 @@ export class EnemyAI {
       chargeLine: null,
       lastSpecialAttackTime: 0,
       warningRing: null,
+      phase: 1,
+      isExploding: false,
+      explosionStartTime: 0,
+      lastHealTime: 0,
     }
 
     // 创建3D模型
@@ -151,6 +156,12 @@ export class EnemyAI {
     this.enemies.forEach(enemy => {
       if (enemy.isDead) return
 
+      // BOSS 阶段转换检测：血量低于50%时进入狂暴阶段
+      if (enemy.config.type === 'boss' && enemy.phase === 1 && enemy.health / enemy.maxHealth < 0.5) {
+        enemy.phase = 2
+        console.log(`BOSS ${enemy.id} 进入狂暴阶段！`)
+      }
+
       // 状态机更新
       this.updateEnemyState(enemy, playerPosition, delta)
 
@@ -167,8 +178,19 @@ export class EnemyAI {
         this.updateBossSpecialAttack(enemy, playerPosition, time)
       }
 
-      // 远程射击（追逐或攻击状态下，非蓄力中）
-      if ((enemy.state === 'chase' || enemy.state === 'attack') && !enemy.isCharging) {
+      // 自爆兵逻辑
+      if (enemy.config.type === 'exploder') {
+        this.updateExploderBehavior(enemy, playerPosition, time)
+      }
+
+      // 治疗者逻辑
+      if (enemy.config.type === 'healer') {
+        this.updateHealerBehavior(enemy, time)
+      }
+
+      // 远程射击（追逐或攻击状态下，非蓄力中，非自爆兵非治疗者）
+      if ((enemy.state === 'chase' || enemy.state === 'attack') && !enemy.isCharging
+          && enemy.config.type !== 'exploder' && enemy.config.type !== 'healer') {
         this.tryShootPlayer(enemy, playerPosition, onPlayerHit)
       }
 
@@ -192,6 +214,11 @@ export class EnemyAI {
 
       // 更新BOSS粒子特效
       updateBossEffects(enemy, time)
+
+      // 更新自爆兵特效
+      if (enemy.config.type === 'exploder' && !enemy.isExploding) {
+        updateExploderEffects(enemy, time)
+      }
     })
 
     // 批量更新所有敌人的血条（带重叠检测）
@@ -301,6 +328,101 @@ export class EnemyAI {
         playChaseAnimation(enemy, time)
         break
     }
+  }
+
+  // ========== 自爆兵行为 ==========
+
+  /** 更新自爆兵行为 */
+  private updateExploderBehavior(enemy: Enemy, playerPosition: THREE.Vector3, time: number): void {
+    if (enemy.isExploding) {
+      // 预警阶段：更新特效，检测是否到达爆炸时间
+      updateExploderEffects(enemy, time)
+      const now = Date.now()
+      if (now - enemy.explosionStartTime >= (enemy.config.explosionWarningDuration || 1000)) {
+        this.triggerExplosion(enemy)
+      }
+      return
+    }
+
+    // 非预警状态：检测是否靠近玩家
+    const distance = enemy.position.distanceTo(playerPosition)
+    const triggerDistance = enemy.config.explosionTriggerDistance || 2
+
+    if (distance <= triggerDistance && enemy.state === 'chase') {
+      // 进入预警状态
+      enemy.isExploding = true
+      enemy.explosionStartTime = Date.now()
+      enemy.state = 'attack'
+    }
+  }
+
+  /** 触发自爆 */
+  private triggerExplosion(enemy: Enemy): void {
+    if (!this.options || enemy.isDead) return
+
+    const { onPlayerHit } = this.options
+    const distance = enemy.position.distanceTo(this.lastPlayerPosition)
+    const explosionRadius = enemy.config.explosionRadius || 3
+
+    // 对玩家造成伤害（距离衰减）
+    if (distance <= explosionRadius) {
+      const damageScale = 1 - (distance / explosionRadius) * 0.5 // 中心100%，边缘50%
+      const damage = Math.round((enemy.config.damage || 40) * damageScale)
+      onPlayerHit(damage)
+    }
+
+    // 自爆兵死亡
+    enemy.health = 0
+    enemy.isDead = true
+    enemy.state = 'dead'
+
+    // 播放死亡动画
+    if (enemy.mesh) {
+      playDeathAnimation(enemy, () => {
+        if (this.scene && enemy.mesh) {
+          this.scene.remove(enemy.mesh)
+        }
+      })
+    }
+
+    // 通知击杀
+    if (this.options && this.options.onEnemyDead) {
+      this.options.onEnemyDead(enemy)
+    }
+  }
+
+  // ========== 治疗者行为 ==========
+
+  /** 更新治疗者行为 */
+  private updateHealerBehavior(enemy: Enemy, time: number): void {
+    if (enemy.isDead) return
+
+    // 更新治疗者特效
+    updateHealerEffects(enemy, time)
+
+    // 检查治疗冷却
+    const healInterval = enemy.config.healInterval || 3000
+    const now = Date.now()
+    if (now - enemy.lastHealTime < healInterval) return
+
+    // 检测周围友军
+    const healRadius = enemy.config.healRadius || 8
+    const healAmount = enemy.config.healAmount || 20
+
+    this.enemies.forEach(other => {
+      if (other.isDead || other.id === enemy.id) return
+      if (other.config.type === 'healer') return // 治疗者不互相治疗
+
+      const distance = other.position.distanceTo(enemy.position)
+      if (distance <= healRadius && other.health < other.maxHealth) {
+        // 恢复血量
+        other.health = Math.min(other.maxHealth, other.health + healAmount)
+        // 创建治疗粒子特效
+        createHealParticles(enemy)
+      }
+    })
+
+    enemy.lastHealTime = now
   }
 
   // 尝试远程射击玩家（弹道投射物模式）
