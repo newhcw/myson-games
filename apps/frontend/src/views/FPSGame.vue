@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, provide, shallowRef } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import * as THREE from 'three'
 import SceneView from '@/components/game/SceneView.vue'
 import EnemyManager from '@/components/game/EnemyManager.vue'
+import { createObstacles } from '@/game/utils/createObstacles'
+import { GAME_CONTEXT_KEY, type GameContext } from '@/game/composables/useGameContext'
+import { useGameSave } from '@/game/composables/useGameSave'
 import { collisionDetector } from '@/game/utils/Collision'
+import { installTestApi } from '@/game/test/testApi'
 import { useWeaponStore } from '@/stores/weapon'
 import { useGameStore } from '@/stores/game'
 import { DEFAULT_WEAPONS } from '@/game/weapons/types'
@@ -14,9 +18,8 @@ import { damageFeedback } from '@/game/ui/DamageFeedback'
 import DeathScreen from '@/game/ui/DeathScreen.vue'
 import { PlayerRocketManager } from '@/game/player-rocket/PlayerRocketManager'
 import { RpgExplosion } from '@/game/player-rocket/RpgExplosion'
-import { storageManager, type GameSaveData } from '@/game/storage/StorageManager'
-import { InputManager, type KeyMapping } from '@/game/input/InputManager'
-import { SwitchWeaponCommand, ReloadCommand, ToggleScopeCommand, JumpCommand, CrouchCommand } from '@/game/input/Command'
+import { InputManager } from '@/game/input/InputManager'
+import { SwitchWeaponCommand, ReloadCommand, JumpCommand, CrouchCommand } from '@/game/input/Command'
 import VirtualJoystick from '@/components/game/VirtualJoystick.vue'
 import VirtualButton from '@/components/game/VirtualButton.vue'
 import { WaveManager, WAVE_CONFIGS, SPAWN_POINTS, INTERMISSION_DURATION, TOTAL_WAVES } from '@/game/wave/WaveManager'
@@ -35,14 +38,23 @@ const containerRef = ref<HTMLDivElement | null>(null)
 const weaponStore = useWeaponStore()
 const gameStore = useGameStore()
 
-// Three.js objects
-let scene: THREE.Scene | null = null
-let camera: THREE.PerspectiveCamera | null = null
-let renderer: THREE.WebGLRenderer | null = null
+// Three.js objects (shallowRef — no deep reactivity needed)
+const scene = shallowRef<THREE.Scene | null>(null)
+const camera = shallowRef<THREE.PerspectiveCamera | null>(null)
+const renderer = shallowRef<THREE.WebGLRenderer | null>(null)
 let animationId: number = 0
 
 // Player state
 const playerPosition = new THREE.Vector3(0, 1.6, 0)
+
+// Provide GameContext for child components
+provide<GameContext>(GAME_CONTEXT_KEY, {
+  scene,
+  camera,
+  renderer,
+  playerPosition,
+})
+
 const moveSpeed = 5
 const keys = { w: false, a: false, s: false, d: false }
 
@@ -125,7 +137,7 @@ const onTouchLookStart = (e: TouchEvent) => {
 
 const onTouchLookMove = (e: TouchEvent) => {
   e.preventDefault()
-  if (!lastTouchLookPosition || !camera) return
+  if (!lastTouchLookPosition || !camera.value) return
 
   const touch = e.touches[0]
   const dx = touch.clientX - lastTouchLookPosition.x
@@ -137,9 +149,9 @@ const onTouchLookMove = (e: TouchEvent) => {
   pitch -= dy * sensitivity
   pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch))
 
-  camera.rotation.order = 'YXZ'
-  camera.rotation.y = yaw
-  camera.rotation.x = pitch
+  camera.value.rotation.order = 'YXZ'
+  camera.value.rotation.y = yaw
+  camera.value.rotation.x = pitch
 
   lastTouchLookPosition = { x: touch.clientX, y: touch.clientY }
 }
@@ -209,6 +221,20 @@ const cameraShake = ref({
 let yaw = 0
 let pitch = 0
 
+// Game save / load
+const {
+  saveCurrentGame,
+  manualSave,
+  loadSavedGame,
+} = useGameSave(
+  playerPosition,
+  () => yaw,
+  (v) => { yaw = v },
+  () => pitch,
+  (v) => { pitch = v },
+  camera,
+)
+
 // View sway (aiming sway/breathing simulation)
 const swayOffset = ref({ x: 0, y: 0 })
 const swayTime = ref(0)
@@ -245,9 +271,9 @@ const onSceneReady = (
   cameraObj: THREE.PerspectiveCamera,
   rendererObj: THREE.WebGLRenderer
 ) => {
-  scene = sceneObj
-  camera = cameraObj
-  renderer = rendererObj
+  scene.value = sceneObj
+  camera.value = cameraObj
+  renderer.value = rendererObj
 
   // 初始化火箭管理器
   rocketManager = new PlayerRocketManager()
@@ -263,7 +289,7 @@ const onSceneReady = (
   })
 
   // Add some obstacles
-  createObstacles()
+  createObstacles(scene.value!)
 
   // ===== 初始化波次管理器 =====
   waveManager = new WaveManager()
@@ -397,71 +423,6 @@ const onEnemyKilled = (_enemyId: string, score: number) => {
   gameStore.addScore(score)
   // 暂时使用击中音效代替击杀音效
   soundManager.playHit()
-}
-
-const createObstacles = () => {
-  if (!scene) return
-
-  // 障碍物预设：类型、位置、尺寸、颜色
-  const obstaclePresets = [
-    // 大型障碍物（建筑/墙壁）- 100HP
-    { type: 'box', size: [4, 3, 1], pos: [-12, 1.5, -8], color: 0x8B7355, castShadow: true, health: 100 },
-    { type: 'box', size: [1, 3, 4], pos: [12, 1.5, -6], color: 0x8B7355, castShadow: true, health: 100 },
-    { type: 'box', size: [6, 2, 1], pos: [0, 1, -15], color: 0x6B8E23, castShadow: true, health: 100 },
-
-    // 中型立方体 - 60HP
-    { type: 'box', size: [2, 2, 2], pos: [-5, 1, -5], color: 0x8B4513, castShadow: true, health: 60 },
-    { type: 'box', size: [2, 2, 2], pos: [5, 1, -8], color: 0xA0522D, castShadow: true, health: 60 },
-    { type: 'box', size: [2, 2, 2], pos: [-8, 1, 3], color: 0x8B4513, castShadow: true, health: 60 },
-    { type: 'box', size: [2, 2, 2], pos: [8, 1, 5], color: 0xA0522D, castShadow: true, health: 60 },
-    { type: 'box', size: [2, 2, 2], pos: [0, 1, -12], color: 0xCD853F, castShadow: true, health: 60 },
-
-    // 低矮障碍物（掩体）- 60HP
-    { type: 'box', size: [3, 1, 1.5], pos: [-3, 0.5, 0], color: 0x708090, castShadow: true, health: 60 },
-    { type: 'box', size: [3, 1, 1.5], pos: [3, 0.5, 2], color: 0x708090, castShadow: true, health: 60 },
-    { type: 'box', size: [1.5, 1, 3], pos: [0, 0.5, 5], color: 0x778899, castShadow: true, health: 60 },
-
-    // 圆柱形障碍物 - 60HP
-    { type: 'cylinder', size: [0.8, 0.8, 3, 16], pos: [-10, 1.5, 0], color: 0x4682B4, castShadow: true, health: 60 },
-    { type: 'cylinder', size: [0.8, 0.8, 3, 16], pos: [10, 1.5, -2], color: 0x4682B4, castShadow: true, health: 60 },
-    { type: 'cylinder', size: [1.2, 1.2, 2, 16], pos: [15, 1, 8], color: 0x5F9EA0, castShadow: true, health: 60 },
-
-    // 小型装饰物 - 30HP
-    { type: 'box', size: [1, 1, 1], pos: [-15, 0.5, 5], color: 0xDEB887, castShadow: true, health: 30 },
-    { type: 'box', size: [1, 1, 1], pos: [15, 0.5, -10], color: 0xDEB887, castShadow: true, health: 30 },
-    { type: 'box', size: [1.5, 0.5, 1.5], pos: [-6, 0.25, 8], color: 0x2E8B57, castShadow: false, health: 30 },
-    { type: 'box', size: [1.5, 0.5, 1.5], pos: [7, 0.25, -15], color: 0x2E8B57, castShadow: false, health: 30 },
-
-    // 中央区域障碍物 - 60HP
-    { type: 'box', size: [2, 1.5, 2], pos: [-2, 0.75, -3], color: 0xB8860B, castShadow: true, health: 60 },
-    { type: 'box', size: [2, 1.5, 2], pos: [2, 0.75, -4], color: 0xB8860B, castShadow: true, health: 60 },
-  ]
-
-  obstaclePresets.forEach((preset) => {
-    let geometry: THREE.BufferGeometry
-    if (preset.type === 'cylinder') {
-      const [rTop, rBottom, height, segments] = preset.size
-      geometry = new THREE.CylinderGeometry(rTop, rBottom, height, segments)
-    } else {
-      const [w, h, d] = preset.size
-      geometry = new THREE.BoxGeometry(w, h, d)
-    }
-
-    const material = new THREE.MeshStandardMaterial({
-      color: preset.color,
-      roughness: 0.8,
-      metalness: 0.1,
-    })
-
-    const mesh = new THREE.Mesh(geometry, material)
-    mesh.position.set(preset.pos[0], preset.pos[1], preset.pos[2])
-    mesh.castShadow = preset.castShadow ?? true
-    mesh.receiveShadow = true
-    scene!.add(mesh)
-
-    // 添加碰撞体（带血量，可被破坏）
-    collisionDetector.addCollider(mesh, preset.health)
-  })
 }
 
 const handleKeyDown = (e: KeyboardEvent) => {
@@ -700,10 +661,10 @@ const handleMouseMove = (e: MouseEvent) => {
   pitch -= e.movementY * sensitivity
   pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch))
 
-  if (camera) {
-    camera.rotation.order = 'YXZ'
-    camera.rotation.y = yaw
-    camera.rotation.x = pitch
+  if (camera.value) {
+    camera.value.rotation.order = 'YXZ'
+    camera.value.rotation.y = yaw
+    camera.value.rotation.x = pitch
   }
 }
 
@@ -818,7 +779,7 @@ const fire = () => {
 
 // Apply weapon recoil to camera
 const applyRecoil = (weapon: any) => {
-  if (!camera) return
+  if (!camera.value) return
 
   // Get recoil pattern (cycle through pattern array)
   const pattern = weapon.recoilPattern || [{ x: 0, y: -0.5 }]
@@ -847,10 +808,10 @@ const applyRecoil = (weapon: any) => {
   pitch += recoilOffset.value.y * 0.01
   pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch))
 
-  if (camera) {
-    camera.rotation.order = 'YXZ'
-    camera.rotation.y = yaw
-    camera.rotation.x = pitch
+  if (camera.value) {
+    camera.value.rotation.order = 'YXZ'
+    camera.value.rotation.y = yaw
+    camera.value.rotation.x = pitch
   }
 
   // Increase spread
@@ -861,11 +822,10 @@ const applyRecoil = (weapon: any) => {
 
 // RPG 火箭发射
 const fireRocket = () => {
-  if (!camera || !scene || !rocketManager) return
+  if (!camera.value) return
 
-  // 获取发射方向（相机朝向）
-  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion)
-  const origin = camera.position.clone()
+  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.value.quaternion)
+  const origin = camera.value.position.clone()
 
   // 略微抬高发射起点（火箭从胸口位置发射）
   origin.y -= 0.1
@@ -879,13 +839,13 @@ const fireRocket = () => {
 
 // 屏幕震动效果
 const startCameraShake = (duration = 0.1, intensity = 0.03) => {
-  if (!camera) return
+  if (!camera.value) return
   cameraShake.value = {
     active: true,
     startTime: Date.now(),
     duration,
     intensity,
-    originalPositions: [camera.position.x, camera.position.y, camera.position.z],
+    originalPositions: [camera.value.position.x, camera.value.position.y, camera.value.position.z],
   }
 }
 
@@ -899,7 +859,7 @@ const updateCameraForShake = () => {
 
   if (elapsed >= shake.duration) {
     cameraShake.value.active = false
-    camera.position.set(
+    camera.value.position.set(
       shake.originalPositions[0],
       shake.originalPositions[1],
       shake.originalPositions[2]
@@ -914,7 +874,7 @@ const updateCameraForShake = () => {
   const offsetX = (Math.random() - 0.5) * 2 * currentIntensity
   const offsetY = (Math.random() - 0.5) * 2 * currentIntensity * 0.5 // 垂直偏移较小
 
-  camera.position.set(
+  camera.value.position.set(
     shake.originalPositions[0] + offsetX,
     shake.originalPositions[1] + offsetY,
     shake.originalPositions[2]
@@ -925,9 +885,9 @@ const updateCameraForShake = () => {
 
 // RPG 爆炸特效文字（BOOM!）
 const showRpgBoomEffect = (position: THREE.Vector3) => {
-  if (!camera) return
+  if (!camera.value) return
 
-  const vector = position.clone().project(camera)
+  const vector = position.clone().project(camera.value)
   const x = (vector.x * 0.5 + 0.5) * window.innerWidth
   const y = (-vector.y * 0.5 + 0.5) * window.innerHeight
 
@@ -973,8 +933,8 @@ let lastRpgExplosion: { x: number; z: number; enemiesInRange: number; totalEnemi
 
 // RPG 火箭爆炸处理（AOE 伤害 + 弹飞效果）
 const handleRocketExplosion = (position: THREE.Vector3) => {
-  if (!enemyManagerRef.value || !scene) {
-    console.warn('handleRocketExplosion: enemyManagerRef or scene is null', !!enemyManagerRef.value, !!scene)
+  if (!enemyManagerRef.value || !scene.value) {
+    console.warn('handleRocketExplosion: enemyManagerRef or scene is null', !!enemyManagerRef.value, !!scene.value)
     return
   }
 
@@ -1039,7 +999,7 @@ const handleRocketExplosion = (position: THREE.Vector3) => {
 
 // 射击检测
 const performRaycast = () => {
-  if (!camera || !scene) return
+  if (!camera.value || !scene.value) return
 
   // Apply spread to aim point (breath hold reduces spread)
   let spread = currentSpread.value
@@ -1053,10 +1013,10 @@ const performRaycast = () => {
   const offsetY = Math.sin(randomAngle) * randomRadius
 
   const raycaster = new THREE.Raycaster()
-  raycaster.setFromCamera(new THREE.Vector2(offsetX, offsetY), camera)
+  raycaster.setFromCamera(new THREE.Vector2(offsetX, offsetY), camera.value)
 
   // 检测场景中的敌人
-  const enemyGroup = scene.getObjectByName('enemies')
+  const enemyGroup = scene.value.getObjectByName('enemies')
   if (enemyGroup && enemyManagerRef.value) {
     const intersects = raycaster.intersectObjects(enemyGroup.children, true)
 
@@ -1090,7 +1050,7 @@ const performRaycast = () => {
 
 // 创建击中特效
 const createHitEffect = (position: THREE.Vector3) => {
-  if (!scene) return
+  if (!scene.value) return
 
   // 创建粒子效果
   const particles = new THREE.Group()
@@ -1126,11 +1086,11 @@ const createHitEffect = (position: THREE.Vector3) => {
     animate()
   }
 
-  scene.add(particles)
+  scene.value.add(particles)
 
   // 1秒后自动清理
   setTimeout(() => {
-    scene?.remove(particles)
+    scene.value?.remove(particles)
     particles.clear()
   }, 1000)
 }
@@ -1205,7 +1165,7 @@ const updateRecoilRecovery = (delta: number) => {
 
 // Update view sway (aiming sway / breathing simulation)
 const updateSway = (delta: number) => {
-  if (!camera) return
+  if (!camera.value) return
 
   // Check if aiming (scope active or holding breath)
   const isAiming = weaponStore.currentScope.isActive || isHoldingBreath.value
@@ -1235,13 +1195,13 @@ const updateSway = (delta: number) => {
   // Clamp pitch
   pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch))
 
-  camera.rotation.order = 'YXZ'
-  camera.rotation.y = yaw
-  camera.rotation.x = pitch
+  camera.value.rotation.order = 'YXZ'
+  camera.value.rotation.y = yaw
+  camera.value.rotation.x = pitch
 }
 
 const updateMovement = (delta: number) => {
-  if (!camera) return
+  if (!camera.value) return
 
   const direction = new THREE.Vector3()
 
@@ -1257,7 +1217,7 @@ const updateMovement = (delta: number) => {
 
   if (direction.length() > 0) {
     direction.normalize()
-    direction.applyQuaternion(camera.quaternion)
+    direction.applyQuaternion(camera.value.quaternion)
     direction.y = 0
     direction.normalize()
 
@@ -1286,7 +1246,7 @@ const updateMovement = (delta: number) => {
   }
 
   // 更新相机位置（使用玩家高度）
-  camera.position.set(playerPosition.x, playerPosition.y, playerPosition.z)
+  camera.value.position.set(playerPosition.x, playerPosition.y, playerPosition.z)
 }
 
 let lastTime = performance.now()
@@ -1336,15 +1296,15 @@ const gameLoop = () => {
     }
 
     // Update scope FOV
-    if (camera && weaponStore.currentScope.isActive) {
+    if (camera.value && weaponStore.currentScope.isActive) {
       const targetFov = weaponStore.currentScope.originalFov / weaponStore.currentScope.magnification
-      camera.fov = THREE.MathUtils.lerp(camera.fov, targetFov, 0.1)
-      camera.updateProjectionMatrix()
+      camera.value.fov = THREE.MathUtils.lerp(camera.value.fov, targetFov, 0.1)
+      camera.value.updateProjectionMatrix()
     }
   }
 
-  if (renderer && scene && camera) {
-    renderer.render(scene, camera)
+  if (renderer.value && scene.value && camera.value) {
+    renderer.value.render(scene.value, camera.value)
   }
 
   animationId = requestAnimationFrame(gameLoop)
@@ -1359,103 +1319,6 @@ const exitGame = () => {
   router.push({ name: 'Home' })
 }
 
-// 保存当前游戏状态
-const saveCurrentGame = () => {
-  if (!gameStore.isPlaying && !gameStore.isPaused) return
-
-  const saveData: GameSaveData = {
-    timestamp: Date.now(),
-    player: {
-      health: gameStore.health,
-      position: { x: playerPosition.x, y: playerPosition.y, z: playerPosition.z },
-      rotation: { yaw, pitch },
-    },
-    game: {
-      score: gameStore.score,
-      kills: gameStore.kills,
-      gameTime: gameStore.gameTime,
-      state: gameStore.gameState,
-    },
-    weapon: {
-      currentIndex: weaponStore.currentWeaponIndex,
-      ammo: Object.fromEntries(weaponStore.ammo) as Record<string, { current: number; reserve: number }>,
-    },
-  }
-
-  storageManager.saveGame(saveData).then((success) => {
-    if (success) {
-      console.log('游戏已自动存档')
-    }
-  })
-}
-
-// 手动存档（F5键）
-const manualSave = () => {
-  saveCurrentGame()
-  // 显示存档提示
-  alert('游戏已存档！')
-}
-
-// 从存档恢复游戏状态
-const loadSavedGame = (): boolean => {
-  const saveData = storageManager.loadGame()
-  if (!saveData) {
-    console.warn('没有找到存档')
-    return false
-  }
-
-  console.log('正在从存档恢复游戏...', saveData)
-
-  // 恢复玩家状态
-  gameStore.health = saveData.player.health
-  playerPosition.set(
-    saveData.player.position.x,
-    saveData.player.position.y,
-    saveData.player.position.z
-  )
-  yaw = saveData.player.rotation.yaw
-  pitch = saveData.player.rotation.pitch
-
-  // 恢复相机位置和旋转
-  if (camera) {
-    camera.position.copy(playerPosition)
-    camera.rotation.order = 'YXZ'
-    camera.rotation.y = yaw
-    camera.rotation.x = pitch
-  }
-
-  // 恢复游戏状态
-  gameStore.score = saveData.game.score
-  gameStore.kills = saveData.game.kills
-  gameStore.gameTime = saveData.game.gameTime
-
-  // 恢复游戏状态（如果之前是暂停状态，需要暂停游戏）
-  if (saveData.game.state === 'paused') {
-    gameStore.gameState = 'paused'
-  } else if (saveData.game.state === 'playing') {
-    gameStore.gameState = 'playing'
-  }
-
-  // 恢复武器状态
-  weaponStore.switchWeapon(saveData.weapon.currentIndex)
-
-  // 恢复弹药状态
-  // 注意：这里需要直接修改 weaponStore 的内部状态
-  // 为了简化，我们重新加载弹药数据
-  if (saveData.weapon.ammo) {
-    Object.entries(saveData.weapon.ammo).forEach(([key, value]) => {
-      const ammoData = weaponStore.ammo.get(key)
-      if (ammoData && value) {
-        ammoData.current = value.current
-        ammoData.reserve = value.reserve
-      }
-    })
-  }
-
-  console.log('游戏已从存档恢复')
-  return true
-}
-
 // 死亡界面相关
 const showDeathScreen = computed(() => gameStore.isDead)
 
@@ -1467,8 +1330,8 @@ const onRestart = () => {
   // 重置视角
   yaw = 0
   pitch = 0
-  if (camera) {
-    camera.rotation.set(0, 0, 0)
+  if (camera.value) {
+    camera.value.rotation.set(0, 0, 0)
   }
   // 清理飞行中的火箭
   rocketManager?.clear()
@@ -1548,6 +1411,24 @@ onMounted(() => {
   // 初始化输入管理器按键映射
   setupInputMappings()
 
+  // 开发环境下安装测试 API
+  if (import.meta.env.DEV) {
+    installTestApi({
+      playerPosition,
+      yaw: { get: () => yaw, set: (v: number) => { yaw = v } },
+      pitch: { get: () => pitch, set: (v: number) => { pitch = v } },
+      camera,
+      scene,
+      enemyManagerRef,
+      rocketManager: { get: () => rocketManager },
+      waveManager: { get: () => waveManager },
+      powerUpManager: { get: () => powerUpManager },
+      onRestart,
+      handleRocketExplosion,
+      fireRocket,
+    })
+  }
+
   // Start game loop after a brief delay to ensure scene is loaded
   setTimeout(() => {
     lastTime = performance.now() // 重置时间基准，避免首帧 delta 过大
@@ -1567,8 +1448,8 @@ onUnmounted(() => {
     cancelAnimationFrame(animationId)
   }
 
-  if (renderer) {
-    renderer.dispose()
+  if (renderer.value) {
+    renderer.value.dispose()
   }
 
   // 清理火箭管理器
@@ -1577,315 +1458,6 @@ onUnmounted(() => {
   // 清理波次管理器和道具管理器
   waveManager?.dispose()
   powerUpManager?.dispose()
-})
-
-
-// ==============================================
-// 👇 👇 👇 从这里开始复制，全部粘贴进去 👇 👇 👇
-// ==============================================
-// ==============================================
-// 修复版：无 process.env，直接兼容你的项目
-// ==============================================
-onMounted(() => {
-  // @ts-ignore 挂载全局测试 API
-  window.__testApi = {
-    // 获取所有活跃敌人
-    getEnemies: () => {
-      if (!enemyManagerRef.value) return []
-      return enemyManagerRef.value.getActiveEnemies() || []
-    },
-
-    // 射击指定索引敌人
-    shootEnemy: (index: number) => {
-      if (!enemyManagerRef.value) return false
-      const enemies = enemyManagerRef.value.getActiveEnemies()
-      const enemy = enemies[index]
-      if (!enemy) return false
-
-      // 造成大量伤害，直接击杀
-      enemyManagerRef.value.onEnemyHit(enemy.id, 999)
-      return true
-    },
-
-    // 手动触发敌人受伤效果
-    hitEnemy: (index: number, damage: number = 10) => {
-      if (!enemyManagerRef.value) return false
-      const enemies = enemyManagerRef.value.getActiveEnemies()
-      const enemy = enemies[index]
-      if (!enemy) return false
-
-      enemyManagerRef.value.onEnemyHit(enemy.id, damage)
-      return true
-    },
-
-    // 获取血条数量（通过 EnemyAI）
-    getHealthBars: () => {
-      if (!enemyManagerRef.value) return []
-      const count = enemyManagerRef.value.getHealthBarCount()
-      // 返回虚拟数组以兼容现有测试
-      return Array.from({ length: count }, (_, i) => ({ index: i }))
-    },
-
-    // 将玩家传送到指定敌人前方（确保敌人能看到玩家）
-    movePlayerToEnemy: (index: number) => {
-      if (!enemyManagerRef.value) return false
-      const enemies = enemyManagerRef.value.getActiveEnemies()
-      const enemy = enemies[index]
-      if (!enemy || !enemy.position) return false
-
-      // 计算敌人朝向的反方向（即玩家应该站的位置）
-      if (enemy.mesh) {
-        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(enemy.mesh.quaternion)
-        playerPosition.set(
-          enemy.position.x - forward.x * 3,
-          playerPosition.y,
-          enemy.position.z - forward.z * 3
-        )
-      } else {
-        playerPosition.set(enemy.position.x + 3, playerPosition.y, enemy.position.z)
-      }
-      return true
-    },
-
-    // 对玩家造成伤害
-    takePlayerDamage: (amount: number) => {
-      gameStore.takeDamage(amount)
-    },
-
-    // 获取玩家血量
-    getPlayerHealth: () => {
-      return gameStore.health
-    },
-
-    // 获取游戏状态
-    getGameState: () => {
-      return gameStore.gameState
-    },
-
-    // 重新开始游戏
-    restartGame: () => {
-      onRestart()
-    },
-
-    // ===== 弹道投射物系统测试 API =====
-
-    // 获取活跃子弹数量
-    getActiveProjectileCount: () => {
-      if (!enemyManagerRef.value) return 0
-      return enemyManagerRef.value.getActiveProjectileCount?.() || 0
-    },
-
-    // 获取敌人蓄力状态
-    getEnemyChargeState: (index: number) => {
-      if (!enemyManagerRef.value) return null
-      const enemies = enemyManagerRef.value.getActiveEnemies()
-      const enemy = enemies[index]
-      if (!enemy) return null
-      return {
-        isCharging: enemy.isCharging,
-        hasChargeLine: enemy.chargeLine !== null,
-      }
-    },
-
-    // 将玩家移动到指定索引敌人正面（别名，兼容旧调用）
-    movePlayerToEnemyFront: (index: number) => {
-      if (!enemyManagerRef.value) return false
-      const enemies = enemyManagerRef.value.getActiveEnemies()
-      const enemy = enemies[index]
-      if (!enemy || !enemy.position) return false
-      if (enemy.mesh) {
-        const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(enemy.mesh.quaternion)
-        playerPosition.set(
-          enemy.position.x - forward.x * 3,
-          playerPosition.y,
-          enemy.position.z - forward.z * 3
-        )
-      }
-      return true
-    },
-
-    // 获取敌人类型
-    getEnemyType: (index: number) => {
-      if (!enemyManagerRef.value) return null
-      const enemies = enemyManagerRef.value.getActiveEnemies()
-      const enemy = enemies[index]
-      if (!enemy || !enemy.config) return null
-      return enemy.config.type
-    },
-
-    // 强制所有敌人面向玩家（用于测试，确保敌人能发现并攻击玩家）
-    forceEnemiesToFacePlayer: () => {
-      if (!enemyManagerRef.value) return false
-      const enemies = enemyManagerRef.value.getActiveEnemies()
-      enemies.forEach((enemy: any) => {
-        if (enemy.mesh && !enemy.isDead) {
-          enemy.mesh.lookAt(playerPosition.x, enemy.mesh.position.y, playerPosition.z)
-          // 强制进入攻击状态
-          if (enemy.state === 'patrol' || enemy.state === 'wait') {
-            enemy.state = 'chase'
-          }
-        }
-      })
-      return true
-    },
-
-    // 生成测试敌人（指定类型，生成在玩家附近）
-    spawnTestEnemy: (type: string) => {
-      if (!enemyManagerRef.value) return -1
-      const pos = playerPosition.clone().add(new THREE.Vector3(5, 0, 0))
-      const enemy = enemyManagerRef.value.spawnTestEnemy(type, pos)
-      if (enemy && enemy.mesh) {
-        enemy.mesh.lookAt(playerPosition.x, enemy.mesh.position.y, playerPosition.z)
-        enemy.state = 'chase'
-      }
-      const enemies = enemyManagerRef.value.getActiveEnemies()
-      return enemies.findIndex((e: any) => e.id === enemy.id)
-    },
-
-    // ===== RPG 武器测试 API =====
-
-    // 切换到 RPG 武器（索引 5）
-    switchToRpg: () => {
-      weaponStore.switchWeapon(5)
-      return true
-    },
-
-    // 获取当前武器类型
-    getCurrentWeaponType: () => {
-      return weaponStore.currentWeapon?.type || null
-    },
-
-    // 获取 RPG 弹药状态
-    getRpgAmmo: () => {
-      const ammoData = weaponStore.ammo.get('rpg')
-      if (!ammoData) return null
-      return { current: ammoData.current, reserve: ammoData.reserve }
-    },
-
-    // 获取活跃火箭数量
-    getActiveRocketCount: () => {
-      return rocketManager?.getActiveRockets?.()?.length ?? 0
-    },
-
-    // 获取血条屏幕坐标（用于验证血条不重叠）
-    getHealthBarPositions: () => {
-      const bars: { id: string; x: number; y: number }[] = []
-      const container = document.getElementById('game-ui')
-      if (!container) return bars
-      const children = container.querySelectorAll('div[style*="position: absolute"]')
-      children.forEach((child) => {
-        const div = child as HTMLDivElement
-        if (div.style.display === 'none') return
-        const left = parseFloat(div.style.left)
-        const top = parseFloat(div.style.top)
-        if (!isNaN(left) && !isNaN(top)) {
-          bars.push({ id: div.textContent || '', x: left, y: top })
-        }
-      })
-      return bars
-    },
-
-    // 手动触发火箭爆炸（用于测试 AOE 效果）
-    triggerRpgExplosion: (x: number, z: number) => {
-      if (!scene) return false
-      handleRocketExplosion(new THREE.Vector3(x, 0, z))
-      return true
-    },
-
-    // 实际发射 RPG 火箭（消耗弹药并调用 fireRocket）
-    fireRpgMissile: () => {
-      if (!camera || !rocketManager) return false
-      const fired = weaponStore.fire()
-      if (!fired) return false
-      fireRocket()
-      return true
-    },
-
-    // 朝指定目标坐标发射火箭（直接计算方向，不依赖相机朝向）
-    fireRpgToward: (x: number, z: number) => {
-      if (!camera || !rocketManager) return false
-      const fired = weaponStore.fire()
-      if (!fired) return false
-      const origin = camera.position.clone()
-      origin.y -= 0.1
-      const dx = x - origin.x
-      const dz = z - origin.z
-      const direction = new THREE.Vector3(dx, 0, dz).normalize()
-      rocketManager.spawn({ origin, direction, speed: 650 })
-      return true
-    },
-
-    // 设置相机朝向（让相机看向指定世界坐标）
-    lookAtTarget: (x: number, z: number) => {
-      if (!camera) return false
-      const dx = x - camera.position.x
-      const dz = z - camera.position.z
-      // 使用 setFromUnitVectors 从默认前方向量(0,0,-1)旋转到目标方向
-      const targetDir = new THREE.Vector3(dx, 0, dz).normalize()
-      const defaultForward = new THREE.Vector3(0, 0, -1)
-      const quat = new THREE.Quaternion().setFromUnitVectors(defaultForward, targetDir)
-      camera.quaternion.copy(quat)
-      // 同步 yaw
-      yaw = Math.atan2(targetDir.x, -targetDir.z)
-      return true
-    },
-
-    // 获取玩家位置
-    getPlayerPosition: () => {
-      return { x: playerPosition.x, y: playerPosition.y, z: playerPosition.z }
-    },
-
-    // 等待火箭爆炸完成（轮询直到所有火箭消失或超时）
-    waitForRocketExplosion: (timeoutMs: number = 5000) => {
-      return new Promise((resolve) => {
-        const startTime = Date.now()
-        const check = () => {
-          const rockets = rocketManager?.getActiveRockets() || []
-          if (rockets.length === 0 || Date.now() - startTime >= timeoutMs) {
-            const enemies = enemyManagerRef.value?.getActiveEnemies() || []
-            resolve({
-              exploded: rockets.length === 0,
-              remainingEnemies: enemies.length,
-              elapsed: Date.now() - startTime,
-              // 包含爆炸诊断信息
-              explosion: lastRpgExplosion ? { ...lastRpgExplosion } : null,
-            })
-            return
-          }
-          requestAnimationFrame(check)
-        }
-        requestAnimationFrame(check)
-      })
-    },
-
-    // ===== 波次系统测试 API =====
-
-    // 获取当前波次
-    getCurrentWave: () => {
-      return waveManager?.getCurrentWave() ?? 1
-    },
-
-    // 获取波次状态
-    getWaveState: () => {
-      return waveManager?.getState() ?? 'waving'
-    },
-
-    // 跳过间歇
-    skipIntermission: () => {
-      waveManager?.skipIntermission()
-    },
-
-    // 获取活跃道具数量
-    getPowerUpCount: () => {
-      return powerUpManager?.getActiveCount() ?? 0
-    },
-
-    // 获取 Buff 状态
-    hasBuff: (type: string) => {
-      return buffsStore.hasBuff(type)
-    },
-
-  }
 })
 
 

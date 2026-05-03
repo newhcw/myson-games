@@ -14,6 +14,13 @@ test.describe('波次系统基础', () => {
 
   test.beforeEach(async ({ page }) => {
     gamePage = new GamePage(page)
+
+    // Capture console logs
+    page.on('console', msg => {
+      if (msg.type() === 'error') console.log('PAGE ERROR:', msg.text())
+    })
+    page.on('pageerror', err => console.log('PAGE EXCEPTION:', err.message))
+
     await gamePage.goto()
     await gamePage.waitForLoaded()
     await gamePage.expectLoaded()

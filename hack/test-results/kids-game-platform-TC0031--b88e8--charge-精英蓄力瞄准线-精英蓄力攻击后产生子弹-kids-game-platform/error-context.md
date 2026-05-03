@@ -6,16 +6,16 @@
 
 # Test info
 
-- Name: kids-game-platform/TC0031-enemy-elite-charge.spec.ts >> 精英蓄力瞄准线 >> 精英进入攻击范围后开始蓄力
-- Location: tests/e2e/kids-game-platform/TC0031-enemy-elite-charge.spec.ts:22:3
+- Name: kids-game-platform/TC0031-enemy-elite-charge.spec.ts >> 精英蓄力瞄准线 >> 精英蓄力攻击后产生子弹
+- Location: tests/e2e/kids-game-platform/TC0031-enemy-elite-charge.spec.ts:50:3
 
 # Error details
 
 ```
 Error: expect(received).toBe(expected) // Object.is equality
 
-Expected: true
-Received: false
+Expected: false
+Received: true
 ```
 
 # Page snapshot
@@ -47,6 +47,9 @@ Received: false
       - generic:
         - paragraph: WASD 移动 | 鼠标控制视角 | 1-6/Q 切换武器 | R 换弹 | 右键倍镜
     - button "退出游戏" [ref=e6]
+  - generic:
+    - generic: 小兵
+    - generic: 100/100
   - generic:
     - generic: 小兵
     - generic: 100/100
@@ -100,8 +103,7 @@ Received: false
   43 | 
   44 |     // 精英应正在蓄力中
   45 |     expect(chargeState).not.toBeNull()
-> 46 |     expect(chargeState.isCharging).toBe(true)
-     |                                    ^ Error: expect(received).toBe(expected) // Object.is equality
+  46 |     expect(chargeState.isCharging).toBe(true)
   47 |     expect(chargeState.hasChargeLine).toBe(true)
   48 |   })
   49 | 
@@ -129,7 +131,8 @@ Received: false
   71 | 
   72 |     // 蓄力状态不再是活跃状态（已发射完成）
   73 |     expect(chargeState).not.toBeNull()
-  74 |     expect(chargeState.isCharging).toBe(false)
+> 74 |     expect(chargeState.isCharging).toBe(false)
+     |                                    ^ Error: expect(received).toBe(expected) // Object.is equality
   75 |   })
   76 | })
   77 | 

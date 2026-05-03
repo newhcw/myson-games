@@ -252,7 +252,12 @@ export class EnemyAI {
         break
 
       case 'chase':
-        if (!canSee) {
+        // 进入攻击距离后切换到攻击状态
+        const distToPlayer = enemy.position.distanceTo(playerPos)
+        const idealRange = enemy.config.type === 'boss' ? 10 : 5
+        if (distToPlayer < idealRange) {
+          enemy.state = 'attack'
+        } else if (!canSee) {
           enemy.state = 'search'
           this.searchTimeout.set(enemy.id, Date.now())
         }
@@ -274,7 +279,12 @@ export class EnemyAI {
         break
 
       case 'attack':
-        if (!canSee) {
+        // 玩家跑远了，重新追击
+        const attackDist = enemy.position.distanceTo(playerPos)
+        const chaseThreshold = enemy.config.type === 'boss' ? 15 : 8
+        if (attackDist > chaseThreshold) {
+          enemy.state = 'chase'
+        } else if (!canSee) {
           enemy.state = 'search'
           this.searchTimeout.set(enemy.id, Date.now())
         }
@@ -326,6 +336,24 @@ export class EnemyAI {
 
       case 'attack':
         playChaseAnimation(enemy, time)
+        // 与玩家保持理想距离，围绕玩家侧移
+        const toPlayer = new THREE.Vector3().subVectors(playerPos, enemy.position)
+        toPlayer.y = 0
+        const attackDistance = toPlayer.length()
+        const idealDistance = enemy.config.type === 'boss' ? 10 : 5
+        if (attackDistance > idealDistance + 2) {
+          // 太远，拉近
+          toPlayer.normalize()
+          enemy.position.add(toPlayer.multiplyScalar(speed * 0.8 * delta))
+        } else if (attackDistance < idealDistance - 2) {
+          // 太近，后退
+          toPlayer.normalize()
+          enemy.position.add(toPlayer.multiplyScalar(-speed * 0.6 * delta))
+        } else {
+          // 在理想距离，侧向移动躲避
+          const strafeDir = new THREE.Vector3(-toPlayer.z, 0, toPlayer.x).normalize()
+          enemy.position.add(strafeDir.multiplyScalar(speed * 0.4 * Math.sin(time * 0.002) * delta))
+        }
         break
     }
   }
