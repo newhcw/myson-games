@@ -69,7 +69,9 @@ export class ProjectileManager {
     projectile.visual = config.visual
     projectile.mesh.visible = true
     projectile.mesh.position.copy(config.position)
-    projectile.mesh.rotation.set(0, Math.atan2(direction.x, direction.z), 0)
+    // 让子弹mesh面朝飞行方向
+    const lookTarget = config.position.clone().add(config.direction)
+    projectile.mesh.lookAt(lookTarget)
 
     // 创建子弹外观
     createProjectileVisual(projectile.mesh, config.visual)
@@ -110,8 +112,8 @@ export class ProjectileManager {
 
       // 子弹始终面朝运动方向
       if (p.velocity.length() > 0.01) {
-        const dir = p.velocity.clone().normalize()
-        p.mesh.rotation.set(0, Math.atan2(dir.x, dir.z), 0)
+        const lookTarget = p.position.clone().add(p.velocity.clone().normalize())
+        p.mesh.lookAt(lookTarget)
       }
 
       // 碰撞检测：水平距离 + 垂直距离分别检测
