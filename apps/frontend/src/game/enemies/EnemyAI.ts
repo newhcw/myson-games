@@ -484,8 +484,8 @@ export class EnemyAI {
     if (!this.projectileManager) return
 
     const config = enemy.config
-    const direction = new THREE.Vector3().subVectors(playerPosition, enemy.position).normalize()
     const spawnPos = enemy.position.clone().add(new THREE.Vector3(0, 1, 0))
+    const direction = new THREE.Vector3().subVectors(playerPosition, spawnPos).normalize()
 
     this.projectileManager.spawn({
       position: spawnPos,
@@ -645,11 +645,12 @@ export class EnemyAI {
     const playerPos = this.lastPlayerPosition
     if (!enemyShooter.canShoot(enemy, playerPos)) return
 
+    const spawnPos = enemy.position.clone().add(new THREE.Vector3(0, 1, 0))
+    const direction = new THREE.Vector3().subVectors(playerPos, spawnPos).normalize()
+
     const special = enemy.config.specialAttack!
     const count = special.projectileCount
     const fanAngle = special.fanAngle
-    const direction = new THREE.Vector3().subVectors(playerPos, enemy.position).normalize()
-    const spawnPos = enemy.position.clone().add(new THREE.Vector3(0, 1, 0))
 
     for (let i = 0; i < count; i++) {
       // 在扇形范围内均匀分布
