@@ -50,6 +50,13 @@ export const POWERUP_INFO: Record<PowerUpType, PowerUpTypeInfo> = {
 /** 所有道具类型（用于随机选择） */
 export const ALL_POWERUP_TYPES: PowerUpType[] = ['health', 'ammo', 'doubleDamage']
 
+/** 道具掉落权重：health 更高权重，确保玩家有回血机会 */
+export const POWERUP_WEIGHTS: Record<PowerUpType, number> = {
+  health: 50,        // 50% 概率掉血包
+  ammo: 30,          // 30% 概率掉弹药
+  doubleDamage: 20,  // 20% 概率掉双倍伤害
+}
+
 /** 场景中的道具实例 */
 export interface PowerUpItem {
   id: string

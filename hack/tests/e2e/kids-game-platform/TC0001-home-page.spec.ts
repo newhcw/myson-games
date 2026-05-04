@@ -16,7 +16,7 @@ test.describe('首页测试', () => {
 
   test('TC0001 - 首页应正确加载并显示标题', async () => {
     await homePage.expectLoaded();
-    await expect(homePage.gameTitle).toHaveText('小勇士大冒险');
+    await expect(homePage.gameTitle).toHaveText('肉肉森林大冒险');
   });
 
   test('TC0002 - 首页应显示主菜单按钮', async () => {

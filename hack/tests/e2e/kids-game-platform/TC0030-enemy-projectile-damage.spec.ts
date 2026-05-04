@@ -46,7 +46,7 @@ test.describe('子弹命中伤害反馈', () => {
 
     // 检查是否回到主页
     await page.waitForTimeout(2000)
-    const homePageTitle = page.locator('h1', { hasText: '小勇士大冒险' })
+    const homePageTitle = page.locator('h1', { hasText: '肉肉森林大冒险' })
     await expect(homePageTitle).toBeVisible({ timeout: 10000 })
   })
 })

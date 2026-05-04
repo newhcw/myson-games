@@ -5,7 +5,7 @@
 
 import * as THREE from 'three'
 import type { PowerUpType, PowerUpItem, PowerUpSpawnConfig, PowerUpCallbacks } from './types'
-import { POWERUP_INFO, ALL_POWERUP_TYPES, POWERUP_CONSTANTS } from './types'
+import { POWERUP_INFO, ALL_POWERUP_TYPES, POWERUP_WEIGHTS, POWERUP_CONSTANTS } from './types'
 
 export class PowerUpManager {
   private scene: THREE.Scene | null = null
@@ -28,9 +28,15 @@ export class PowerUpManager {
     this.playerPosition.copy(pos)
   }
 
-  /** 随机选择一个道具类型 */
+  /** 根据权重随机选择一个道具类型（血量优先） */
   static randomType(): PowerUpType {
-    return ALL_POWERUP_TYPES[Math.floor(Math.random() * ALL_POWERUP_TYPES.length)]
+    const totalWeight = POWERUP_WEIGHTS.health + POWERUP_WEIGHTS.ammo + POWERUP_WEIGHTS.doubleDamage
+    let r = Math.random() * totalWeight
+    for (const type of ALL_POWERUP_TYPES) {
+      r -= POWERUP_WEIGHTS[type]
+      if (r <= 0) return type
+    }
+    return 'health' // fallback
   }
 
   /**

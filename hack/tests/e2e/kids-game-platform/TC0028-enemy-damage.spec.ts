@@ -107,7 +107,7 @@ test.describe('敌人伤害系统', () => {
     await page.waitForTimeout(2000)
 
     // 检查是否回到主页
-    const homePageTitle = page.locator('h1', { hasText: '小勇士大冒险' })
+    const homePageTitle = page.locator('h1', { hasText: '肉肉森林大冒险' })
     await expect(homePageTitle).toBeVisible({ timeout: 10000 })
   })
 })

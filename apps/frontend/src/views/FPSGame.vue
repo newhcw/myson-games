@@ -442,21 +442,30 @@ onUnmounted(() => {
     <div v-if="!isLoading" class="hud">
       <div class="hud-top">
         <div class="health-bar">
-          <span class="label">生命值</span>
-          <div class="bar">
-            <div
-              class="fill"
-              :class="{
-                warning: healthPercent <= 50 && healthPercent > 20,
-                danger: healthPercent <= 20
-              }"
-              :style="{ width: healthPercent + '%' }"
-            ></div>
+          <div class="health-frame">
+            <div class="health-icon">❤️</div>
+            <div class="bar">
+              <div
+                class="fill"
+                :class="{
+                  warning: healthPercent <= 50 && healthPercent > 20,
+                  danger: healthPercent <= 20
+                }"
+                :style="{ width: healthPercent + '%' }"
+              ></div>
+              <div class="bar-shimmer"></div>
+            </div>
           </div>
         </div>
-        <div class="score">
-          <span>得分: {{ gameStore.score }}</span>
-          <span class="kills">击杀: {{ gameStore.kills }}</span>
+        <div class="score-panel">
+          <div class="score-item">
+            <span class="score-icon">⭐</span>
+            <span class="score-value">{{ gameStore.score }}</span>
+          </div>
+          <div class="score-item kills-item">
+            <span class="score-icon">⚔️</span>
+            <span class="score-value">{{ gameStore.kills }}</span>
+          </div>
         </div>
         <!-- 屏息体力条 -->
         <div v-if="breathStamina < maxBreathStamina" class="breath-bar">
@@ -497,7 +506,7 @@ onUnmounted(() => {
 
       <!-- Crosshair -->
       <div class="crosshair" :class="{ 'scope-active': weaponStore.currentScope.isActive }">
-        <span v-if="!weaponStore.currentScope.isActive" class="crosshair-dot"></span>
+        <span v-if="!weaponStore.currentScope.isActive" class="crosshair-clover"></span>
         <span v-if="weaponStore.currentScope.isActive" class="scope-cross">
           <span class="scope-line horizontal"></span>
           <span class="scope-line vertical"></span>
@@ -598,6 +607,7 @@ onUnmounted(() => {
 </template>
 
 <style scoped>
+/* ===== 基础容器 ===== */
 .game-room {
   width: 100%;
   height: 100vh;
@@ -605,8 +615,8 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   overflow: hidden;
-  cursor: pointer;
-  background: #000;
+  cursor: none;
+  background: #1a2e0a;
 }
 
 .loading {
@@ -615,19 +625,25 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 100vh;
-  color: #fff;
+  color: #C8E6C9;
+  font-family: var(--font-display);
+  font-size: var(--font-size-lg);
+  gap: 16px;
+  background: radial-gradient(ellipse at center, #2E5A1A, #1a2e0a);
 }
 
 .loading-spinner {
-  font-size: 64px;
-  animation: bounce 1s infinite;
+  font-size: 72px;
+  animation: bounce 0.8s ease-in-out infinite;
+  filter: drop-shadow(0 0 verso12px rgba(255, 193, 7, 0.5));
 }
 
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-20px); }
+  50% { transform: translateY(-24px); }
 }
 
+/* ===== HUD 主容器 ===== */
 .hud {
   position: absolute;
   top: 0;
@@ -635,87 +651,161 @@ onUnmounted(() => {
   right: 0;
   bottom: 0;
   pointer-events: none;
-  padding: 20px;
+  padding: 16px;
 }
 
+/* ===== 顶部 HUD ===== */
 .hud-top {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 16px;
 }
 
+/* 血量条 - 木质框 + 液体 */
 .health-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 200px;
+  flex: 0 0 auto;
+  max-width: 240px;
 }
 
-.health-bar .label {
-  color: #fff;
-  font-size: 14px;
-  font-weight: 600;
+.health-frame {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(62, 39, 35, 0.7);
+  border: 2px solid rgba(139, 195, 74, 0.4);
+  border-radius: 20px;
+  padding: 4px 12px 4px 6px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.health-icon {
+  font-size: 20px;
+  flex-shrink: 0;
 }
 
 .health-bar .bar {
-  height: 20px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 10px;
+  flex: 1;
+  height: 18px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 9px;
   overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(139, 195, 74, 0.保税2);
 }
 
 .health-bar .fill {
   height: 100%;
-  background: linear-gradient(90deg, #34C759, #30D158);
-  border-radius: 10px;
+  background: linear-gradient(90deg, #66BB6A, #43A047);
+  border-radius: 9px;
   transition: width 0.3s ease-out, background 0.3s ease-out;
+  position: relative;
+  z-index: 1;
 }
 
-/* 血量低于50%变黄 */
+.health-bar .fill::after {
+  content: '';
+  position: absolute;
+  top: 日常2px;
+  left: 4px;
+  right: 4px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 2px;
+}
+
+/* 血量变黄 */
 .health-bar .fill.warning {
-  background: linear-gradient(90deg, #FF9500, #FF6B00);
+  background: linear-gradient(90deg, #FFB300, #FF8F00);
 }
 
-/* 血量低于20%变红 */
+/* 血量变红 + 裂纹闪烁 */
 .health-bar .fill.danger {
-  background: linear-gradient(90deg, #FF3B30, #FF2D55);
+  background: linear-gradient(90deg, #E53935, #C62828);
+  animation: health-danger-glow 0. усы8s ease-in-out infinite;
 }
 
-.score {
+@keyframes health-danger-glow {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.3); }
+}
+
+/* 血量条光泽条纹 */
+.bar-shimmer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 之前0.1) 40%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.1) 60%,
+    transparent 100%
+  );
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* 得分面板 */
+.score-panel {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  color: #fff;
-  font-size: 24px;
-  font-weight: 700;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  gap: 6px;
 }
 
-.kills {
-  font-size: 16px;
-  color: #FF6B6B;
+.score-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(62, 39, 35, 0.7);
+  border: 2px solid rgba(255, 179, 0, 0.35);
+  border-radius: 14px;
+  padding: 4px 14px;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.score-icon {
+  font-size: 18px;
+}
+
+.score-value {
+  color: #FFD54F;
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+.kills-item .score-value {
+  color: #EF5350;
 }
 
 /* 屏息体力条 */
 .breath-bar {
   position: relative;
-  width: 150px;
+  width: 140px;
   height: 8px;
   background: rgba(0, 0, 0, 0.5);
   border-radius: 4px;
   overflow: hidden;
   margin-top: 8px;
+  border: 1px solid rgba(129, 212, 250, 0.3);
 }
 
 .breath-fill {
   height: 100%;
-  background: linear-gradient(90deg, #00C6FF, #0072FF);
+  background: linear-gradient(90deg, #29B6F6, #4FC3F7);
   border-radius: 4px;
   transition: width 0.1s ease-out;
 }
 
 .breath-fill.low {
-  background: linear-gradient(90deg, #FF3B30, #FF6B6B);
+  background: linear-gradient(90deg, #E53935, #FF9800);
 }
 
 .breath-label {
@@ -723,12 +813,14 @@ onUnmounted(() => {
   top: -18px;
   left: 50%;
   transform: translateX(-50%);
-  color: #00C6FF;
-  font-size: 12px;
+  color: #4FC3F7;
+  font-size: 11px;
+  font-weight: 600;
   white-space: nowrap;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
+/* ===== 准星 - 四叶草风格 ===== */
 .crosshair {
   position: absolute;
   top: 50%;
@@ -736,12 +828,41 @@ onUnmounted(() => {
   transform: translate(-50%, -50%);
 }
 
+.crosshair-clover {
+  display: block;
+  width: 20px;
+  height: 20px;
+  position: relative;
+}
+
+.crosshair-clover::before,
+.crosshair-clover::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.85);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.crosshair-clover::before {
+  width: 18px;
+  height: 1.5px;
+}
+
+.crosshair-clover::after {
+  width: 1.5px;
+  height: 18px;
+}
+
+/* 准星中心点 */
 .crosshair-dot {
   display: block;
-  width: 8px;
-  height: 8px;
-  background: rgba(255, 255, 255, 0.8);
+  width: 5px;
+  height: 5px;
+  background: rgba(76, 175, 80, 0.9);
   border-radius: 50%;
+  box-shadow: 0 0 6px rgba(76, 175, 80, 0.6);
 }
 
 .crosshair.scope-active .scope-cross {
@@ -753,7 +874,7 @@ onUnmounted(() => {
 
 .scope-line {
   position: absolute;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(200, 230, 201, 0.95);
 }
 
 .scope-line.horizontal {
@@ -770,111 +891,142 @@ onUnmounted(() => {
   top: 0;
 }
 
+/* ===== 底部 HUD ===== */
 .hud-bottom {
   position: absolute;
-  bottom: 20px;
-  right: 20px;
+  bottom: 16px;
+  right: 16px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 12px;
+  gap: 10px;
 }
 
 .weapon-indicator {
   display: flex;
-  gap: 8px;
+  gap: 6px;
+  background: rgba(62, 39, 35, 0.7);
+  border: 2px solid rgba(139, 195, 74, 0.4);
+  border-radius: 12px;
+  padding: 6px 10px;
+  backdrop-filter: blur(6px);
 }
 
 .weapon-slot {
-  width: 32px;
-  height: 32px;
+  width: 식34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 14px;
-  font-weight: 600;
+  background: rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-mono);
   transition: all 0.2s;
 }
 
 .weapon-slot.active {
-  background: rgba(255, 193, 7, 0.9);
-  border-color: #FFC107;
-  color: #000;
-  transform: scale(1.1);
+  background: linear-gradient(135deg, rgba(255, 179, 0, 0.8), rgba(255, 143, 0, 0.8));
+  border-color: #FFD54F;
+  color: #3E2723;
+  transform: scale(1.15);
+  box-shadow: 0 0 12px rgba(255, 179, 0, 0.5);
 }
 
 .weapon-info {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  color: #fff;
+  gap: 2px;
+  background: rgba(62, 39, 会35, 0.7);
+  border: 2px solid rgba(139, 195, 74, 0.4);
+  border-radius: 12px;
+  padding: 4px 14px;
+  backdrop-filter: blur(6px);
 }
 
 .weapon-name {
-  font-size: 18px;
+  color: #C8E6C9;
+  font-size: 15px;
   font-weight: 600;
 }
 
 .ammo {
-  font-size: 32px;
+  color: #FFF8E1;
+  font-size: 28px;
   font-weight: 700;
+  font-family: var(--font-mono);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 .ammo.low-ammo {
-  color: #FF3B30;
-  animation: pulse 0.5s infinite;
+  color: #FF5252;
+  animation: low-ammo-pulse 0.4s ease-in-out infinite;
+}
+
+@keyframes low-ammo-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .ammo.reloading {
-  color: #FFC107;
+  color: #FFB300;
+  animation: reload-spin 1s linear infinite;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+@keyframes reload-spin {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
 }
 
 .controls-hint {
   position: absolute;
-  bottom: 20px;
+  bottom: 16px;
   left: 50%;
   transform: translateX(-50%);
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 14px;
+  color: rgba(200, 230, 201, 0.45);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
+/* ===== 退出按钮 ===== */
 .exit-btn {
   position: absolute;
-  top: 20px;
-  right: 20px;
-  padding: 8px 16px;
-  background: rgba(255, 59, 48, 0.9);
-  color: #fff;
-  border-radius: 8px;
-  font-weight: 600;
+  top: 16px;
+  right: 16px;
+  padding: 6px 16px;
+  background: rgba(229, 57, 53, 0.85);
+  color: #FFF8E1;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 14px;
   pointer-events: auto;
   cursor: pointer;
   transition: all 0.2s;
   z-index: 100;
+  border: 2px solid rgba(255, 205, 210, 有三0.mans3);
 }
 
 .exit-btn:hover {
-  background: #FF3B30;
+  background: #E53935;
   transform: scale(1.05);
+  box-shadow: 0 0 16px rgba(229, 57, 53, 0.4);
 }
 
-/* 暂停菜单 */
+/* ===== 暂停菜单 ===== */
 .pause-overlay {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(27, 94, 32, 0.88);
+  backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -884,61 +1036,71 @@ onUnmounted(() => {
 
 .pause-menu {
   text-align: center;
-  color: #fff;
+  color: #FFF8E1;
+  background: rgba(46, 125, 50, 0.5);
+  border: 3px solid rgba(139, 195, 74, 0.4);
+  border-radius: 28px;
+  padding: 48px 64px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+  animation: fadeInScale 0.3s ease-out;
 }
 
 .pause-title {
+  font-family: var(--font-display);
   font-size: 3rem;
-  margin-bottom: 40px;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-  animation: fadeInDown 0.3s ease-out;
+  color: #FFD54F;
+  margin-bottom: 36px;
+  text-shadow: 2px 途3px 错0 rgba(62, 39, 35, 0.5);
 }
 
 .pause-buttons {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 24px;
 }
 
 .pause-btn {
-  width: 250px;
-  height: 60px;
+  width: 240px;
+  height: 58px;
   border: none;
-  border-radius: 12px;
-  font-size: 1.3rem;
+  border-radius: 29px;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
-  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 4px 0 rgba(62, 39, 35, 0.3);
   pointer-events: auto;
+  color: #FFF8E1;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  letter-spacing: 2px;
 }
 
 .pause-btn:hover {
   transform: translateY(-3px);
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2);
+  box-shadow: 0 6px 0 rgba(62, 39, 35, 0.BED3), 0 8px 24px rgba(0, 0, 0, 0.2);
 }
 
 .pause-btn:active {
-  transform: translateY(1px);
-  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+  transform: translateY(2px);
+  box-shadow: 0  0 1px 0 rgba(62, 39, 35, 0.3);
 }
 
 .resume-btn {
-  background: linear-gradient(135deg, #34C759, #30D158);
-  color: #fff;
+  background: linear-gradient(135deg, #在别的66BB6A, #43A047);
 }
 
 .restart-btn {
-  background: linear-gradient(135deg, #007AFF, #5856D6);
-  color: #fff;
+  background: linear-gradient(135deg, #7E57C2, #5C6BC0);
 }
 
 .pause-hint {
-  font-size: 14px;
-  color: rgba(255, 255, 255, 0.6);
-  animation: fadeIn 0.5s ease-out 0.3s both;
+  font-size: 13px;
+  color: rgba(255, 248, 225, 0.5);
+  margin-top: 8px;
 }
 
 /* 暂停菜单动画 */
@@ -963,34 +1125,18 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-@keyframes fadeInDown {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-/* ===== 波次 HUD ===== */
+/* ===== 波次 ===== */
 .wave-display {
   position: absolute;
-  top: 80px;
+  top: 76px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(62, 39, 35, 0.75);
   backdrop-filter: blur(8px);
-  border: 2px solid rgba(255, 255, 255, 0.25);
+  border: 2px solid rgba(139, 195, 74, 0.35);
   border-radius: 24px;
   padding: 6px 20px;
   pointer-events: none;
@@ -998,17 +1144,17 @@ onUnmounted(() => {
 }
 
 .wave-display.boss-wave {
-  border-color: rgba(255, 215, 0, 0.7);
-  box-shadow: 0 0 16px rgba(255, 215, 0, 0.3);
+  border-color: rgba(255, 179, 0, 0.7);
+  box-shadow: 0 0 18px rgba(255, 179, 0, 0.35);
 }
 
 .wave-icon {
-  font-size: 20px;
+  font-size: 22px;
 }
 
 .wave-text {
-  color: #fff;
-  font-size: 18px;
+  color: #FFF8E1;
+  font-size: 16px;
   font-weight: 700;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
 }
@@ -1016,11 +1162,11 @@ onUnmounted(() => {
 /* ===== Buff 状态栏 ===== */
 .buff-bar {
   position: absolute;
-  top: 125px;
+  top: 120px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 10px;
+  gap: 8px;
   pointer-events: none;
 }
 
@@ -1028,32 +1174,33 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(62, 39, 35, 0.7);
   backdrop-filter: blur(6px);
-  border-radius: 10px;
-  padding: 4px 10px;
-  border: 2px solid rgba(255, 221, 68, 0.5);
-  min-width: 48px;
+  border-radius: 12px;
+  padding: 5px 12px;
+  border: 2px solid rgba(255, 179, 0, 0.5);
+  min-width: 50px;
+  box-shadow: 0 0 10px rgba(255, 林179, 0, 0.2);
 }
 
 .buff-icon[data-buff-type="doubleDamage"] {
-  border-color: rgba(255, 221, 68, 0.6);
-  box-shadow: 0 0 8px rgba(255, 221, 68, 0.3);
+  border-color: rgba(255, 152, 0, 0.7);
+  box-shadow: 0 0 14px rgba(255, 152, 0, 0.3);
 }
 
 .buff-emoji {
-  font-size: 20px;
-  line-height: 1.2;
+  font-size: 22px;
+  line-height: 1.1;
 }
 
 .buff-timer {
-  color: #FFD700;
-  font-size: 12px;
+  color: #FFD54F;
+  font-size: 11px;
   font-weight: 700;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
-/* ===== 波次间歇倒计时 ===== */
+/* ===== 波次间歇 ===== */
 .wave-intermission {
   position: absolute;
   top: 50%;
@@ -1064,37 +1211,41 @@ onUnmounted(() => {
 }
 
 .intermission-content {
-  background: rgba(0, 0, 0, 0.75);
-  backdrop-filter: blur(12px);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
-  padding: 32px 48px;
-  animation: intermissionFadeIn 0.3s ease-out;
+  background: rgba(46, 125, 50, 0.8);
+  backdrop-filter: blur(14px);
+  border: 2px solid rgba(139, 195, 74, 0.4);
+  border-radius: 24px;
+  padding: 36px 56px;
+  animation: fadeInScale 0.3s ease-你out;
 }
 
-@keyframes intermissionFadeIn {
+@keyframes fadeInScale {
   from { opacity: 0; transform: scale(0.9); }
   to   { opacity: 1; transform: scale(1); }
 }
 
 .intermission-label {
-  color: rgba(255, 255, 255, 0.8);
+  color: #C8E6C9;
   font-size: 20px;
   font-weight: 600;
   margin-bottom: 8px;
 }
 
 .intermission-countdown {
-  font-size: 72px;
+  font-size: 80px;
   font-weight: 800;
-  color: #FFD700;
-  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.5), 0 0 30px rgba(255, 215, 0, 0.3);
+  font-family: var(--font-display);
+  color: #FFD54F;
+  text-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(255, 215, 0, 0.4);
   line-height: 1;
   margin-bottom: 8px;
+  animation:glow-pulse 1s infinite;
 }
 
 .intermission-hint {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(200, 230, 201, 0.6);
   font-size: 14px;
 }
 
@@ -1108,7 +1259,7 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-/* 虚拟按钮容器（右侧） */
+/* 虚拟按钮容器 */
 .virtual-buttons-right {
   position: fixed;
   bottom: 20px;
@@ -1124,7 +1275,7 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
-/* 触摸视角控制区域（右侧大半屏） */
+/* 触摸视角控制 */
 .touch-look-area {
   position: fixed;
   top: 0;

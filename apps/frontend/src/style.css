@@ -1,51 +1,69 @@
 :root {
-  /* 主题色 - 明亮活泼的蓝色系 */
-  --color-primary: #4A90D9;
-  --color-primary-light: #6BA8E5;
-  --color-primary-dark: #357ABD;
+  /* ===== 童话森林主题色 ===== */
 
-  /* 强调色 - 温暖的橙色 */
-  --color-accent: #FF9500;
-  --color-accent-light: #FFB340;
-  --color-accent-dark: #E68600;
+  /* 森林绿系 */
+  --color-primary: #4CAF50;
+  --color-primary-light: #81C784;
+  --color-primary-dark: #388E3C;
 
-  /* 背景色 */
-  --color-bg: #F5F8FC;
+  /* 阳光金 - 暖调强调色 */
+  --color-accent: #FFB300;
+  --color-accent-light: #FFD54F;
+  --color-accent-dark: #FF8F00;
+
+  /* 浆果红 - 危险/警告 */
+  --color-danger: #E53935;
+  --color-danger-light: #EF5350;
+
+  /* 天空蓝 - 信息 */
+  --color-info: #29B6F6;
+  --color-info-light: #4FC3F7;
+
+  /* 琥珀橙 - 次要强调 */
+  --color-warning: #FF9800;
+  --color-warning-light: #FFB74D;
+
+  /* 蜜瓜绿 - 成功 */
+  --color-success: #66BB6A;
+  --color-success-light: #81C784;
+
+  /* 背景色系 */
+  --color-bg: #F1F8E9;
   --color-bg-card: #FFFFFF;
-  --color-bg-dark: #1A1D24;
+  --color-bg-dark: #1B5E20;
+  --color-bg-overlay: rgba(27, 94, 32, 0.85);
 
-  /* 内容色 */
-  --color-text: #333333;
-  --color-text-light: #666666;
-  --color-text-inverse: #FFFFFF;
-
-  /* 功能色 */
-  --color-success: #34C759;
-  --color-warning: #FFD60A;
-  --color-danger: #FF3B30;
-  --color-info: #5AC8FA;
+  /* 内容色 - 暖棕色系文字 */
+  --color-text: #3E2723;
+  --color-text-light: #6D4C41;
+  --color-text-inverse: #FFF8E1;
+  --color-text-gold: #F9A825;
 
   /* 边框与阴影 */
-  --border-radius-sm: 8px;
-  --border-radius-md: 12px;
-  --border-radius-lg: 20px;
-  --border-radius-xl: 30px;
+  --border-radius-sm: 10px;
+  --border-radius-md: 16px;
+  --border-radius-lg: 24px;
+  --border-radius-xl: 32px;
   --border-radius-full: 9999px;
 
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.16);
-  --shadow-glow: 0 0 20px rgba(74, 144, 217, 0.4);
+  --shadow-sm: 0 2px 8px rgba(46, 125, 50, 0.12);
+  --shadow-md: 0 4px 16px rgba(46, 125, 50, 0.18);
+  --shadow-lg: 0 8px 32px rgba(46, 125, 50, 0.24);
+  --shadow-glow: 0 0 24px rgba(255, 179, 0, 0.45);
+  --shadow-wood: 0 4px 0 rgba(62, 39, 35, 0.3);
 
   /* 字体 */
-  --font-family: 'Nunito', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-display: 'Fredoka One', 'PingFang SC', 'Microsoft YaHei', cursive;
+  --font-body: 'Baloo 2', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'Nunito', monospace;
+
   --font-size-xs: 12px;
   --font-size-sm: 14px;
   --font-size-base: 16px;
-  --font-size-lg: 18px;
-  --font-size-xl: 24px;
-  --font-size-2xl: 32px;
-  --font-size-3xl: 48px;
+  --font-size-lg: 20px;
+  --font-size-xl: 26px;
+  --font-size-2xl: 36px;
+  --font-size-3xl: 52px;
 
   /* 间距 */
   --spacing-xs: 4px;
@@ -57,17 +75,18 @@
 
   /* 过渡 */
   --transition-fast: 0.15s ease;
-  --transition-base: 0.25s ease;
-  --transition-slow: 0.4s ease;
+  --transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-bounce: 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 
-/* 深色模式 */
+/* 深色模式 - 暮光森林 */
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #1A1D24;
-    --color-bg-card: #252A34;
-    --color-text: #E5E5E5;
-    --color-text-light: #A0A0A0;
+    --color-bg: #1A2E1A;
+    --color-bg-card: #263A26;
+    --color-text: #E8D5B7;
+    --color-text-light: #A8C8A0;
   }
 }
 
@@ -81,7 +100,7 @@
 html, body {
   width: 100%;
   height: 100%;
-  font-family: var(--font-family);
+  font-family: var(--font-body);
   font-size: var(--font-size-base);
   line-height: 1.6;
   color: var(--color-text);
@@ -97,9 +116,11 @@ html, body {
 
 /* 标题样式 */
 h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
   font-weight: 700;
   line-height: 1.3;
   color: var(--color-text);
+  letter-spacing: 0.02em;
 }
 
 h1 { font-size: var(--font-size-3xl); }
@@ -120,7 +141,7 @@ a:hover {
 
 /* 按钮基础样式 */
 button {
-  font-family: inherit;
+  font-family: var(--font-body);
   font-size: inherit;
   cursor: pointer;
   border: none;
@@ -135,34 +156,81 @@ button {
   box-shadow: var(--shadow-md);
   padding: var(--spacing-lg);
   transition: transform var(--transition-base), box-shadow var(--transition-base);
+  border: 2px solid rgba(139, 195, 74, 0.2);
 }
 
 .card:hover {
   transform: translateY(-4px);
   box-shadow: var(--shadow-lg);
+  border-color: rgba(139, 195, 74, 0.5);
 }
 
-/* 滚动条样式 */
+/* 滚动条 - 藤蔓绿色 */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
   background: var(--color-bg);
-}
-
-::-webkit-scrollbar-thumb {
-  background: var(--color-primary);
   border-radius: var(--border-radius-full);
 }
 
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--color-primary), var(--color-primary-dark));
+  border-radius: var(--border-radius-full);
+  border: 2px solid var(--color-bg);
+}
+
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-primary-dark);
+  background: linear-gradient(180deg, var(--color-primary-light), var(--color-primary));
 }
 
 /* 选中文字颜色 */
 ::selection {
-  background: var(--color-primary);
-  color: var(--color-text-inverse);
+  background: var(--color-accent);
+  color: var(--color-text);
+}
+
+/* ===== 全局动画关键帧 ===== */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  33% { transform: translateY(-8px) rotate(1deg); }
+  66% { transform: translateY(4px) rotate(-1deg); }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-16px); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 179, 0, 0.3); }
+  50% { box-shadow: 0 0 24px rgba(255, 179, 0, 0.6); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes wobble {
+  0%, 100% { transform: rotate(0); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
 }
