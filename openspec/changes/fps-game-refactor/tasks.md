@@ -13,14 +13,14 @@
 
 ## 2. 核心 Composable 提取
 
-- [ ] 2.1 实现 usePlayerMovement composable（`src/game/composables/usePlayerMovement.ts`），封装 WASD 移动、跑步、蹲下、跳跃物理、碰撞检测和相机位置同步
-- [ ] 2.2 实现 usePlayerInput composable（`src/game/composables/usePlayerInput.ts`），封装键盘/鼠标/触摸事件监听、InputManager 映射、指针锁定控制和 ESC/F9 特殊键处理
-- [ ] 2.3 实现 useCameraEffects composable（`src/game/composables/useCameraEffects.ts`），封装屏息体力、视角摇晃、呼吸模拟、后坐力恢复和 RPG 镜头震动
-- [ ] 2.4 实现 useShooting composable（`src/game/composables/useShooting.ts`），封装射击逻辑、raycast、RPG 发射、后坐力应用、自动开火和爆炸伤害处理
-- [ ] 2.5 实现 useWaveSystem composable（`src/game/composables/useWaveSystem.ts`），封装 WaveManager/PowerUpManager 初始化、回调注册、敌人生成和间歇倒计时
-- [ ] 2.6 重构 FPSGame.vue gameLoop，改为调用各 composable 的 update(delta) 方法
-- [ ] 2.7 重构 FPSGame.vue onSceneReady，改为调用 useWaveSystem 的初始化方法并设置 GameContext
-- [ ] 2.8 重构 FPSGame.vue onMounted/onUnmounted，集成 usePlayerInput 的事件注册/清理和各 composable 的生命周期
+- [x] 2.1 实现 usePlayerMovement composable（`src/game/composables/usePlayerMovement.ts`），封装 WASD 移动、跑步、蹲下、跳跃物理、碰撞检测和相机位置同步
+- [x] 2.2 实现 usePlayerInput composable（`src/game/composables/usePlayerInput.ts`），封装键盘/鼠标/触摸事件监听、InputManager 映射、指针锁定控制和 ESC/F9 特殊键处理
+- [x] 2.3 实现 useCameraEffects composable（`src/game/composables/useCameraEffects.ts`），封装屏息体力、视角摇晃、呼吸模拟、后坐力恢复和 RPG 镜头震动
+- [x] 2.4 实现 useShooting composable（`src/game/composables/useShooting.ts`），封装射击逻辑、raycast、RPG 发射、后坐力应用、自动开火和爆炸伤害处理
+- [x] 2.5 实现 useWaveSystem composable（`src/game/composables/useWaveSystem.ts`），封装 WaveManager/PowerUpManager 初始化、回调注册、敌人生成和间歇倒计时
+- [x] 2.6 重构 FPSGame.vue gameLoop，改为调用各 composable 的 update(delta) 方法
+- [x] 2.7 重构 FPSGame.vue onSceneReady，改为调用 useWaveSystem 的初始化方法并设置 GameContext
+- [x] 2.8 重构 FPSGame.vue onMounted/onUnmounted，集成 usePlayerInput 的事件注册/清理和各 composable 的生命周期
 - [ ] 2.9 验证阶段 2：运行 E2E 测试确认移动、射击、波次、波次间歇跳过、道具拾取、屏息、镜头效果等功能正常
 
 ## 3. 子组件拆分与最终清理

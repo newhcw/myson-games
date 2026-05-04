@@ -19,7 +19,8 @@
       "Bash(playwright test *)",
       "Bash(pkill -f playwright)",
       "Bash(tee /tmp/test-output.txt)",
-      "WebFetch(domain:www.shanghai-ferry.com)"
+      "WebFetch(domain:www.shanghai-ferry.com)",
+      "WebFetch(domain:localhost)"
     ]
   }
 }

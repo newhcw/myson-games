@@ -5,29 +5,23 @@ import * as THREE from 'three'
 import SceneView from '@/components/game/SceneView.vue'
 import EnemyManager from '@/components/game/EnemyManager.vue'
 import { createObstacles } from '@/game/utils/createObstacles'
-import { GAME_CONTEXT_KEY, type GameContext } from '@/game/composables/useGameContext'
+import { GAME_CONTEXT_KEY, type GameContext, type ViewAngles } from '@/game/composables/useGameContext'
 import { useGameSave } from '@/game/composables/useGameSave'
-import { collisionDetector } from '@/game/utils/Collision'
-import { installTestApi } from '@/game/test/testApi'
+import { usePlayerMovement } from '@/game/composables/usePlayerMovement'
+import { usePlayerInput } from '@/game/composables/usePlayerInput'
+import { useCameraEffects } from '@/game/composables/useCameraEffects'
+import { useShooting } from '@/game/composables/useShooting'
+import { useWaveSystem } from '@/game/composables/useWaveSystem'
 import { useWeaponStore } from '@/stores/weapon'
 import { useGameStore } from '@/stores/game'
 import { DEFAULT_WEAPONS } from '@/game/weapons/types'
-import { DEFAULT_KEY_BINDINGS, type KeyBindingConfig } from '@/game/input/KeyBindings'
 import { soundManager } from '@/game/sound/SoundManager'
 import { damageFeedback } from '@/game/ui/DamageFeedback'
 import DeathScreen from '@/game/ui/DeathScreen.vue'
-import { PlayerRocketManager } from '@/game/player-rocket/PlayerRocketManager'
-import { RpgExplosion } from '@/game/player-rocket/RpgExplosion'
-import { InputManager } from '@/game/input/InputManager'
-import { SwitchWeaponCommand, ReloadCommand, JumpCommand, CrouchCommand } from '@/game/input/Command'
+import VictoryScreen from '@/game/ui/VictoryScreen.vue'
 import VirtualJoystick from '@/components/game/VirtualJoystick.vue'
 import VirtualButton from '@/components/game/VirtualButton.vue'
-import { WaveManager, WAVE_CONFIGS, SPAWN_POINTS, INTERMISSION_DURATION, TOTAL_WAVES } from '@/game/wave/WaveManager'
-import type { WaveState } from '@/game/wave/types'
-import { PowerUpManager } from '@/game/powerups/PowerUpManager'
-import { useBuffsStore } from '@/stores/buffs'
-import VictoryScreen from '@/game/ui/VictoryScreen.vue'
-import type { EnemyTypeKeyword } from '@/game/wave/types'
+import { installTestApi } from '@/game/test/testApi'
 
 const router = useRouter()
 const route = useRoute()
@@ -55,196 +49,71 @@ provide<GameContext>(GAME_CONTEXT_KEY, {
   playerPosition,
 })
 
-const moveSpeed = 5
-const keys = { w: false, a: false, s: false, d: false }
+// View angles (shared between composables)
+const viewAngles: ViewAngles = { yaw: 0, pitch: 0 }
 
-// Player actions state
-const isRunning = ref(false)
-const isCrouching = ref(false)
-const playerHeight = ref(1.6)
-const jumpVelocity = ref(0)
-const isJumping = ref(false)
-const gravity = -9.8
+// 敌人管理器引用（在 composable 使用前声明）
+const enemyManagerRef = ref<any>(null)
 
-// Input manager
-const inputManager = new InputManager()
-
-// Touch device detection
-const isTouchDevice = ref(false)
-// Virtual joystick state
-const virtualMove = { x: 0, y: 0 }
-
-// Virtual control handlers
-const onVirtualMove = (direction: { x: number; y: number }) => {
-  virtualMove.x = direction.x
-  virtualMove.y = direction.y
-
-  // Convert to keys (matching updateMovement logic)
-  keys.w = direction.y < -0.5
-  keys.s = direction.y > 0.5
-  keys.a = direction.x < -0.5
-  keys.d = direction.x > 0.5
-}
-
-const onVirtualStop = () => {
-  virtualMove.x = 0
-  virtualMove.y = 0
-  keys.w = false
-  keys.s = false
-  keys.a = false
-  keys.d = false
-}
-
-const onVirtualButtonPress = (type: string) => {
-  switch (type) {
-    case 'shoot':
-      isFiring.value = true
-      fire()
-      break
-    case 'jump':
-      if (!isJumping.value) {
-        isJumping.value = true
-        jumpVelocity.value = 5
-      }
-      break
-    case 'crouch':
-      isCrouching.value = !isCrouching.value
-      playerHeight.value = isCrouching.value ? 0.8 : 1.6
-      break
-    case 'reload':
-      weaponStore.reload()
-      break
-    case 'scope':
-      weaponStore.toggleScope()
-      break
-  }
-}
-
-const onVirtualButtonRelease = (type: string) => {
-  if (type === 'shoot') {
-    isFiring.value = false
-  }
-}
-
-// 触摸视角控制
-let lastTouchLookPosition: { x: number; y: number } | null = null
-
-const onTouchLookStart = (e: TouchEvent) => {
-  e.preventDefault()
-  const touch = e.touches[0]
-  lastTouchLookPosition = { x: touch.clientX, y: touch.clientY }
-}
-
-const onTouchLookMove = (e: TouchEvent) => {
-  e.preventDefault()
-  if (!lastTouchLookPosition || !camera.value) return
-
-  const touch = e.touches[0]
-  const dx = touch.clientX - lastTouchLookPosition.x
-  const dy = touch.clientY - lastTouchLookPosition.y
-
-  // 更新视角（类似鼠标移动）
-  const sensitivity = 0.005
-  yaw -= dx * sensitivity
-  pitch -= dy * sensitivity
-  pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch))
-
-  camera.value.rotation.order = 'YXZ'
-  camera.value.rotation.y = yaw
-  camera.value.rotation.x = pitch
-
-  lastTouchLookPosition = { x: touch.clientX, y: touch.clientY }
-}
-
-const onTouchLookEnd = (e: TouchEvent) => {
-  e.preventDefault()
-  lastTouchLookPosition = null
-}
-
-// Shooting state
-const lastFireTime = ref(0)
-const isFiring = ref(false)
-
-// Recoil state (camera shake from weapon fire)
-const recoilOffset = ref({ x: 0, y: 0 })
-const recoilIndex = ref(0) // Track consecutive shots for recoil pattern
-const lastFireTimeForRecoil = ref(0)
-
-// Spread state (bullet inaccuracy)
-const currentSpread = ref(0)
-const lastFireTimeForSpread = ref(0)
-
-// ===== 波次系统状态 =====
-let waveManager: WaveManager | null = null
-let powerUpManager: PowerUpManager | null = null
-const currentWave = ref(1)
-const waveState = ref<WaveState>('waving')
-const intermissionCountdown = ref(0)
-const showVictoryScreen = ref(false)
-
-// Buff store
-const buffsStore = useBuffsStore()
-
-// Wave HUD computed
-const waveProgressText = computed(() => `第 ${currentWave.value} / ${TOTAL_WAVES} 波`)
-const isBossWave = computed(() => WAVE_CONFIGS[currentWave.value - 1]?.isBossWave === true)
-
-// Buff HUD computed
-const activeBuffs = computed(() => buffsStore.getActiveBuffs)
-
-// Breath hold (hold breath for stability)
-const isHoldingBreath = ref(false)
-const breathStamina = ref(100) // 0-100
-const maxBreathStamina = 100
-const breathConsumptionRate = 20 // per second
-const breathRecoveryRate = 10 // per second
-const minStaminaToStart = 10 // Minimum stamina to start holding breath
-
-// Computed for breath bar style
-const breathBarStyle = computed(() => ({
-  width: breathStamina.value + '%',
-}))
-
-// Rocket manager
-let rocketManager: PlayerRocketManager | null = null
-
-// Camera shake for RPG effect
-const cameraShake = ref({
-  active: false,
-  startTime: 0,
-  duration: 0.1,
-  intensity: 0.03,
-  originalPositions: [] as number[],
-})
-
-// Mouse look
-let yaw = 0
-let pitch = 0
-
-// Game save / load
+// Composable: Wave System (declared early because waveState is needed by usePlayerInput)
+const waveSystem = useWaveSystem()
 const {
-  saveCurrentGame,
-  manualSave,
-  loadSavedGame,
-} = useGameSave(
-  playerPosition,
-  () => yaw,
-  (v) => { yaw = v },
-  () => pitch,
-  (v) => { pitch = v },
+  currentWave,
+  waveState,
+  intermissionCountdown,
+  showVictoryScreen,
+  waveProgressText,
+  isBossWave,
+  activeBuffs,
+} = waveSystem
+
+// Composable: Player Movement
+const playerMovement = usePlayerMovement(camera, playerPosition)
+const {
+  keys,
+  isRunning,
+  isCrouching,
+  isJumping,
+  jumpVelocity,
+  playerHeight,
+} = playerMovement
+
+// Composable: Player Input
+const inputCallbacks: any = {}
+const playerInput = usePlayerInput(
+  containerRef,
   camera,
+  viewAngles,
+  keys,
+  isRunning,
+  waveState,
+  inputCallbacks,
 )
 
-// View sway (aiming sway/breathing simulation)
-const swayOffset = ref({ x: 0, y: 0 })
-const swayTime = ref(0)
-const swayAmount = 0.003 // Base sway amount (in radians)
-const swaySpeed = 1.5 // Sway oscillation speed
-const aimingSwayMultiplier = 0.3 // Reduced sway when aiming down sights
-const breathingSway = ref({ x: 0, y: 0 })
-const breathingTime = ref(0)
-const breathingAmount = 0.002 // Breathing sway amount
-const breathingSpeed = 0.5 // Breathing cycle speed
+// Composable: Camera Effects
+const cameraEffects = useCameraEffects(camera, viewAngles)
+const {
+  isHoldingBreath,
+  breathStamina,
+  maxBreathStamina,
+  currentSpread,
+  applyRecoil,
+  startCameraShake,
+} = cameraEffects
+
+// Composable: Shooting
+const shooting = useShooting({
+  camera,
+  scene,
+  playerPosition,
+  viewAngles,
+  enemyManagerRef,
+  isHoldingBreath,
+  breathStamina,
+  currentSpread,
+  applyRecoil,
+  startCameraShake,
+})
 
 // Computed
 const currentWeaponName = computed(() => {
@@ -259,12 +128,77 @@ const ammoDisplay = computed(() => {
   return `${ammo.current} / ${ammo.reserve}`
 })
 
-const healthPercent = computed(() => {
-  return (gameStore.health / 100) * 100 // 最大血量是100
-})
+const healthPercent = computed(() => (gameStore.health / 100) * 100)
 
 const isReloading = computed(() => weaponStore.isReloading)
 const currentWeaponIndex = computed(() => weaponStore.currentWeaponIndex)
+
+const breathBarStyle = computed(() => ({
+  width: breathStamina.value + '%',
+}))
+
+// Game save / load — uses viewAngles now
+const {
+  saveCurrentGame,
+  manualSave,
+  loadSavedGame,
+} = useGameSave(
+  playerPosition,
+  () => viewAngles.yaw,
+  (v) => { viewAngles.yaw = v },
+  () => viewAngles.pitch,
+  (v) => { viewAngles.pitch = v },
+  camera,
+)
+
+// 暂停游戏并退出指针锁定（需在 inputCallbacks 之前声明）
+const pauseGameAndUnlock = () => {
+  gameStore.pauseGame()
+  if (document.pointerLockElement) {
+    document.exitPointerLock()
+  }
+  soundManager.playScope()
+}
+
+// 恢复游戏并重新锁定指针
+const resumeGameAndLock = async () => {
+  gameStore.resumeGame()
+  if (containerRef.value) {
+    try {
+      await containerRef.value.requestPointerLock()
+    } catch (err) {
+      console.error('Failed to lock pointer:', err)
+    }
+  }
+  soundManager.playScope()
+}
+
+// Fill input callbacks (now all composable refs are available)
+Object.assign(inputCallbacks, {
+  onShoot: () => shooting.fire(),
+  onJump: () => playerMovement.jump(),
+  onToggleCrouch: () => playerMovement.toggleCrouch(),
+  onReload: () => weaponStore.reload(),
+  onToggleScope: () => weaponStore.toggleScope(),
+  onPause: pauseGameAndUnlock,
+  onResume: resumeGameAndLock,
+  onManualSave: manualSave,
+  onSkipIntermission: () => waveSystem.skipIntermission(),
+})
+
+// Destructure input helpers for template
+const {
+  isTouchDevice,
+  virtualMove: virtualMove,
+  onVirtualMove,
+  onVirtualStop,
+  onVirtualButtonPress,
+  onVirtualButtonRelease,
+  onTouchLookStart,
+  onTouchLookMove,
+  onTouchLookEnd,
+  handleClick,
+} = playerInput
 
 const onSceneReady = (
   sceneObj: THREE.Scene,
@@ -275,138 +209,28 @@ const onSceneReady = (
   camera.value = cameraObj
   renderer.value = rendererObj
 
-  // 初始化火箭管理器
-  rocketManager = new PlayerRocketManager()
-  rocketManager.setScene(sceneObj)
-  rocketManager.setOnExplosion((pos) => {
-    handleRocketExplosion(pos)
-  })
-  // 设置敌人位置提供器：火箭飞行时检测敌人接近
-  rocketManager.setEnemyProvider(() => {
-    if (!enemyManagerRef.value) return []
-    const enemies = enemyManagerRef.value.getActiveEnemies() || []
-    return enemies.map((e: any) => ({ position: e.position, isDead: e.isDead }))
-  })
+  // Init rocket manager via shooting composable
+  shooting.initRocketManager(sceneObj)
 
-  // Add some obstacles
+  // Add obstacles
   createObstacles(scene.value!)
 
-  // ===== 初始化波次管理器 =====
-  waveManager = new WaveManager()
-  waveManager.setCallbacks({
-    onWaveStart: (waveNumber: number) => {
-      currentWave.value = waveNumber
-      waveState.value = 'waving'
-      intermissionCountdown.value = 0
-      console.log(`第 ${waveNumber} 波开始`)
-      // 生成敌人
-      spawnWaveEnemies(waveNumber)
-    },
-    onWaveClear: (waveNumber: number) => {
-      waveState.value = 'intermission'
-      intermissionCountdown.value = INTERMISSION_DURATION
-      console.log(`第 ${waveNumber} 波完成，进入间歇`)
-    },
-    onAllWavesComplete: () => {
-      waveState.value = 'victory'
-      showVictoryScreen.value = true
-      // 强制退出暂停状态，确保 VictoryScreen 可交互
-      if (gameStore.isPaused) {
-        gameStore.resumeGame()
+  // Init wave system
+  waveSystem.init(sceneObj, enemyManagerRef, () => {
+    if (route.query.continue === 'true') {
+      const loaded = loadSavedGame()
+      if (loaded) {
+        console.log('已从存档恢复游戏')
+      } else {
+        console.warn('存档恢复失败，开始新游戏')
       }
-      // 退出指针锁定
-      if (document.pointerLockElement) {
-        document.exitPointerLock()
-      }
-      console.log('通关！')
-    },
-  })
-
-  // ===== 初始化道具管理器 =====
-  powerUpManager = new PowerUpManager()
-  powerUpManager.setScene(sceneObj)
-  powerUpManager.setCallbacks({
-    onHealthPickup: (amount: number) => {
-      // 恢复生命
-      const newHealth = Math.min(gameStore.maxHealth, gameStore.health + amount)
-      gameStore.health = newHealth
-      console.log(`恢复 ${amount} HP，当前 HP: ${newHealth}`)
-    },
-    onAmmoPickup: () => {
-      // 补满当前武器弹药
-      const weapon = weaponStore.currentWeapon
-      if (!weapon) return
-      const ammoData = weaponStore.ammo.get(weapon.id)
-      if (ammoData) {
-        ammoData.current = weapon.magazineSize
-        weaponStore.ammo.set(weapon.id, { ...ammoData })
-        console.log('弹药已补满')
-      }
-    },
-    onDoubleDamagePickup: (duration: number) => {
-      buffsStore.addBuff('doubleDamage', duration)
-      console.log(`双倍伤害激活，持续 ${duration} 秒`)
-    },
-  })
-
-  // 使用 watch 确保 EnemyManager 挂载后注册回调并开始第 1 波
-  let gameStarted = false
-  watch(enemyManagerRef, (mgr) => {
-    if (mgr && !gameStarted) {
-      gameStarted = true
-      mgr.setOnEnemyKilled((enemyId: string) => {
-        waveManager?.onEnemyKilled(enemyId)
-      })
-      mgr.setPowerUpManager(powerUpManager)
-      // 开始第 1 波（此时 enemyManager 已就绪）
-      waveManager?.startGame()
+      return loaded
     }
-  }, { immediate: true })
-
-  // 检查是否需要从存档恢复游戏
-  if (route.query.continue === 'true') {
-    const loaded = loadSavedGame()
-    if (loaded) {
-      console.log('已从存档恢复游戏')
-      if (gameStore.isPaused) {
-        if (document.pointerLockElement) {
-          document.exitPointerLock()
-        }
-      }
-    } else {
-      console.warn('存档恢复失败，开始新游戏')
-    }
-  }
+    return false
+  })
 
   isLoading.value = false
 }
-
-// 按波次配置生成敌人
-const spawnWaveEnemies = (waveNumber: number): void => {
-  if (!enemyManagerRef.value) return
-  const config = WAVE_CONFIGS[waveNumber - 1]
-  if (!config) return
-
-  // 随机选择 2-3 个刷新点
-  const shuffled = [...SPAWN_POINTS].sort(() => Math.random() - 0.5)
-  const pointCount = 2 + Math.floor(Math.random() * 2) // 2-3
-  const selectedPoints = shuffled.slice(0, pointCount).map(
-    (p) => new THREE.Vector3(p.x, 0, p.z)
-  )
-
-  const configs: { type: EnemyTypeKeyword; count: number }[] = []
-  config.enemies.forEach((e) => {
-    configs.push({ type: e.type, count: e.count })
-  })
-
-  const spawnedIds = enemyManagerRef.value.spawnEnemies(configs, selectedPoints)
-  if (waveManager) {
-    waveManager.registerEnemies(spawnedIds)
-  }
-}
-
-// 敌人管理器引用（使用 ref 以便模板 ref 自动绑定）
-const enemyManagerRef = ref<any>(null)
 
 // 处理玩家被击中
 const onPlayerHit = (damage: number) => {
@@ -425,830 +249,6 @@ const onEnemyKilled = (_enemyId: string, score: number) => {
   soundManager.playHit()
 }
 
-const handleKeyDown = (e: KeyboardEvent) => {
-  // F9键：手动存档
-  if (e.key === 'F9') {
-    e.preventDefault()
-    manualSave()
-    return
-  }
-
-  // ESC键：切换暂停
-  if (e.key === 'Escape') {
-    e.preventDefault()
-    if (gameStore.isPaused) {
-      resumeGameAndLock()
-    } else if (gameStore.isPlaying) {
-      pauseGameAndUnlock()
-    }
-    return
-  }
-
-  // 空格键：波次间歇时提前开始
-  if (e.key === ' ' && waveState.value === 'intermission' && waveManager) {
-    e.preventDefault()
-    waveManager.skipIntermission()
-    return
-  }
-
-  // Ignore if not in game or game is paused
-  if (document.pointerLockElement !== containerRef.value || gameStore.isPaused) return
-
-  // 移动按键仍然直接处理（连续输入）
-  switch (e.key.toLowerCase()) {
-    case 'w': keys.w = true; break
-    case 'a': keys.a = true; break
-    case 's': keys.s = true; break
-    case 'd': keys.d = true; break
-    // Shift: 跑动
-    case 'shift': isRunning.value = true; break
-  }
-
-  // 让输入管理器处理离散动作（武器切换、换弹等）
-  inputManager.handleKeyDown(e.key)
-}
-
-// 设置输入管理器按键映射
-const setupInputMappings = () => {
-  // 加载用户自定义按键映射
-  const savedBindings = localStorage.getItem('game-key-bindings')
-  let bindings: KeyBindingConfig
-  if (savedBindings) {
-    try {
-      bindings = JSON.parse(savedBindings)
-    } catch {
-      bindings = { ...DEFAULT_KEY_BINDINGS }
-    }
-  } else {
-    bindings = { ...DEFAULT_KEY_BINDINGS }
-  }
-
-  // 辅助函数：根据 action 获取按键
-  const getKey = (action: string): string => {
-    return bindings[action] || DEFAULT_KEY_BINDINGS[action] || ''
-  }
-
-  // 武器切换 (1-6)
-  inputManager.registerKey(getKey('switch_weapon_1'), {
-    action: 'switch_weapon_0',
-    commandFactory: () => new SwitchWeaponCommand(
-      { value: weaponStore.currentWeaponIndex },
-      0,
-      (idx) => weaponStore.switchWeapon(idx)
-    ),
-    bufferable: false,
-  })
-
-  inputManager.registerKey(getKey('switch_weapon_2'), {
-    action: 'switch_weapon_1',
-    commandFactory: () => new SwitchWeaponCommand(
-      { value: weaponStore.currentWeaponIndex },
-      1,
-      (idx) => weaponStore.switchWeapon(idx)
-    ),
-    bufferable: false,
-  })
-
-  inputManager.registerKey(getKey('switch_weapon_3'), {
-    action: 'switch_weapon_2',
-    commandFactory: () => new SwitchWeaponCommand(
-      { value: weaponStore.currentWeaponIndex },
-      2,
-      (idx) => weaponStore.switchWeapon(idx)
-    ),
-    bufferable: false,
-  })
-
-  inputManager.registerKey(getKey('switch_weapon_4'), {
-    action: 'switch_weapon_3',
-    commandFactory: () => new SwitchWeaponCommand(
-      { value: weaponStore.currentWeaponIndex },
-      3,
-      (idx) => weaponStore.switchWeapon(idx)
-    ),
-    bufferable: false,
-  })
-
-  inputManager.registerKey(getKey('switch_weapon_5'), {
-    action: 'switch_weapon_4',
-    commandFactory: () => new SwitchWeaponCommand(
-      { value: weaponStore.currentWeaponIndex },
-      4,
-      (idx) => weaponStore.switchWeapon(idx)
-    ),
-    bufferable: false,
-  })
-
-  inputManager.registerKey(getKey('switch_weapon_6'), {
-    action: 'switch_weapon_5',
-    commandFactory: () => new SwitchWeaponCommand(
-      { value: weaponStore.currentWeaponIndex },
-      5,
-      (idx) => weaponStore.switchWeapon(idx)
-    ),
-    bufferable: false,
-  })
-
-  // Q：循环切换武器
-  inputManager.registerKey(getKey('cycle_weapon'), {
-    action: 'cycle_weapon',
-    commandFactory: () => ({
-      execute: () => weaponStore.cycleWeapon(),
-      undo: () => weaponStore.cycleWeapon(), // 再次切换回到上一个
-    }),
-    bufferable: false,
-  })
-
-  // R：换弹
-  inputManager.registerKey(getKey('reload'), {
-    action: 'reload',
-    commandFactory: () => new ReloadCommand(
-      () => weaponStore.reload()
-    ),
-    bufferable: false,
-  })
-
-  // Shift：跑动（按下时加速，释放时减速）
-  inputManager.registerKey(getKey('run'), {
-    action: 'run_toggle',
-    commandFactory: (isPressed) => ({
-      execute: () => { isRunning.value = isPressed },
-      undo: () => { isRunning.value = !isPressed },
-    }),
-    bufferable: false,
-  })
-
-  // B：屏息稳定（减少后坐力和散布）
-  inputManager.registerKey(getKey('hold_breath'), {
-    action: 'hold_breath',
-    commandFactory: (isPressed) => ({
-      execute: () => {
-        if (isPressed && breathStamina.value >= minStaminaToStart) {
-          isHoldingBreath.value = true
-        } else if (!isPressed) {
-          isHoldingBreath.value = false
-        }
-      },
-      undo: () => {
-        isHoldingBreath.value = false
-      },
-    }),
-    bufferable: false,
-  })
-
-  // Ctrl：下蹲（切换）
-  inputManager.registerKey(getKey('crouch'), {
-    action: 'crouch_toggle',
-    commandFactory: (isPressed) => new CrouchCommand(
-      { value: playerHeight.value },
-      isCrouching.value ? 1.6 : 0.8
-    ),
-    bufferable: false,
-  })
-
-  // Space：跳跃
-  inputManager.registerKey(getKey('jump'), {
-    action: 'jump',
-    commandFactory: () => new JumpCommand(
-      playerPosition,
-      1.5
-    ),
-    bufferable: true,
-  })
-
-  console.log('Input mappings initialized:', inputManager.getRegisteredKeys())
-}
-
-// 暂停游戏并退出指针锁定
-const pauseGameAndUnlock = () => {
-  gameStore.pauseGame()
-  if (document.pointerLockElement) {
-    document.exitPointerLock()
-  }
-  soundManager.playScope() // 使用现有的音效
-}
-
-// 恢复游戏并重新锁定指针
-const resumeGameAndLock = async () => {
-  gameStore.resumeGame()
-  if (containerRef.value) {
-    try {
-      await containerRef.value.requestPointerLock()
-    } catch (err) {
-      console.error('Failed to lock pointer:', err)
-    }
-  }
-  soundManager.playScope()
-}
-
-const handleKeyUp = (e: KeyboardEvent) => {
-  switch (e.key.toLowerCase()) {
-    case 'w': keys.w = false; break
-    case 'a': keys.a = false; break
-    case 's': keys.s = false; break
-    case 'd': keys.d = false; break
-  }
-
-  // 让输入管理器处理离散动作
-  inputManager.handleKeyUp(e.key)
-}
-
-const handleMouseMove = (e: MouseEvent) => {
-  if (document.pointerLockElement !== containerRef.value) return
-
-  const sensitivity = 0.002
-  yaw -= e.movementX * sensitivity
-  pitch -= e.movementY * sensitivity
-  pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch))
-
-  if (camera.value) {
-    camera.value.rotation.order = 'YXZ'
-    camera.value.rotation.y = yaw
-    camera.value.rotation.x = pitch
-  }
-}
-
-const handleClick = async () => {
-  if (!containerRef.value) return
-
-  // First click: lock pointer
-  if (document.pointerLockElement !== containerRef.value) {
-    try {
-      await containerRef.value.requestPointerLock()
-      // Initialize audio context on user interaction
-      soundManager.resume()
-    } catch (err) {
-      console.error('Failed to lock pointer:', err)
-    }
-  }
-}
-
-// Handle mouse down for shooting
-const handleMouseDown = (e: MouseEvent) => {
-  if (document.pointerLockElement !== containerRef.value) return
-
-  // 从按键映射读取射击键配置
-  const savedBindings = localStorage.getItem('game-key-bindings')
-  let shootKey = 'mouseleft'
-  if (savedBindings) {
-    try {
-      const bindings = JSON.parse(savedBindings)
-      shootKey = bindings['shoot'] || 'mouseleft'
-    } catch {}
-  }
-
-  // 映射鼠标按钮：mouseleft → 0, mouseright → 2
-  const buttonMap: Record<string, number> = { mouseleft: 0, mouseright: 2 }
-  const shootButton = buttonMap[shootKey] ?? 0
-
-  if (e.button === shootButton) {
-    isFiring.value = true
-    fire()
-  }
-}
-
-const handleMouseUp = (e: MouseEvent) => {
-  if (e.button === 0) {
-    isFiring.value = false
-  }
-}
-
-// Handle right click for scope
-const handleContextMenu = (e: MouseEvent) => {
-  e.preventDefault()
-  if (document.pointerLockElement !== containerRef.value) return
-
-  // 从按键映射读取瞄准键配置
-  const savedBindings = localStorage.getItem('game-key-bindings')
-  let scopeKey = 'mouseright'
-  if (savedBindings) {
-    try {
-      const bindings = JSON.parse(savedBindings)
-      scopeKey = bindings['scope'] || 'mouseright'
-    } catch {}
-  }
-
-  // 只有配置为鼠标右键时才执行
-  if (scopeKey === 'mouseright') {
-    weaponStore.toggleScope()
-  }
-}
-
-// Fire weapon
-const fire = () => {
-  const weapon = weaponStore.currentWeapon
-  if (!weapon) return
-
-  const now = Date.now()
-  // Check fire rate
-  const fireInterval = 1000 / weapon.fireRate
-  if (now - lastFireTime.value < fireInterval) return
-  lastFireTime.value = now
-
-  const ammo = weaponStore.currentAmmo
-
-  // Check if has ammo
-  if (ammo.current <= 0 || weaponStore.isReloading) {
-    // Play empty click sound
-    soundManager.playEmpty()
-    return
-  }
-
-  // Attempt to fire (checks ammo and reload state)
-  const fired = weaponStore.fire()
-  if (fired) {
-    // Apply recoil
-    applyRecoil(weapon)
-
-    // RPG 武器：发射火箭弹道
-    if (weapon.type === 'rpg') {
-      fireRocket()
-      // 屏幕震动效果
-      startCameraShake(0.1, 0.03)
-    } else {
-      // Perform raycast to check for enemy hits (with spread)
-      performRaycast()
-    }
-    // Play fire sound
-    soundManager.playShoot()
-  } else {
-    // Play empty click if no ammo
-    soundManager.playEmpty()
-  }
-}
-
-// Apply weapon recoil to camera
-const applyRecoil = (weapon: any) => {
-  if (!camera.value) return
-
-  // Get recoil pattern (cycle through pattern array)
-  const pattern = weapon.recoilPattern || [{ x: 0, y: -0.5 }]
-  const patternIndex = recoilIndex.value % pattern.length
-  const recoil = pattern[patternIndex]
-
-  // Calculate recoil multiplier (breath hold reduces recoil)
-  let recoilMultiplier = 1.0
-  if (isHoldingBreath.value && breathStamina.value > 0) {
-    recoilMultiplier = 0.3 // 70% reduction when holding breath
-  }
-
-  // Apply recoil offset (scaled by recoilAmount and breath hold)
-  recoilOffset.value.x += recoil.x * weapon.recoilAmount * recoilMultiplier
-  recoilOffset.value.y += recoil.y * weapon.recoilAmount * recoilMultiplier
-
-  // Clamp recoil offset
-  recoilOffset.value.x = Math.max(-0.5, Math.min(0.5, recoilOffset.value.x))
-  recoilOffset.value.y = Math.max(-1.0, Math.min(0.2, recoilOffset.value.y))
-
-  // Update recoil index for next shot
-  recoilIndex.value++
-
-  // Apply to camera (pitch and yaw)
-  yaw += recoilOffset.value.x * 0.01
-  pitch += recoilOffset.value.y * 0.01
-  pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch))
-
-  if (camera.value) {
-    camera.value.rotation.order = 'YXZ'
-    camera.value.rotation.y = yaw
-    camera.value.rotation.x = pitch
-  }
-
-  // Increase spread
-  currentSpread.value = Math.min(weapon.spread, currentSpread.value + weapon.spread * 0.3)
-  lastFireTimeForRecoil.value = Date.now()
-  lastFireTimeForSpread.value = Date.now()
-}
-
-// RPG 火箭发射
-const fireRocket = () => {
-  if (!camera.value) return
-
-  const direction = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.value.quaternion)
-  const origin = camera.value.position.clone()
-
-  // 略微抬高发射起点（火箭从胸口位置发射）
-  origin.y -= 0.1
-
-  rocketManager.spawn({
-    origin,
-    direction,
-    speed: 650,
-  })
-}
-
-// 屏幕震动效果
-const startCameraShake = (duration = 0.1, intensity = 0.03) => {
-  if (!camera.value) return
-  cameraShake.value = {
-    active: true,
-    startTime: Date.now(),
-    duration,
-    intensity,
-    originalPositions: [camera.value.position.x, camera.value.position.y, camera.value.position.z],
-  }
-}
-
-// 游戏循环中更新相机震动位置
-const updateCameraForShake = () => {
-  if (!camera || !cameraShake.value.active) return false
-
-  const now = Date.now()
-  const shake = cameraShake.value
-  const elapsed = (now - shake.startTime) / 1000
-
-  if (elapsed >= shake.duration) {
-    cameraShake.value.active = false
-    camera.value.position.set(
-      shake.originalPositions[0],
-      shake.originalPositions[1],
-      shake.originalPositions[2]
-    )
-    return false
-  }
-
-  const progress = elapsed / shake.duration
-  // 震动强度随时间减弱
-  const currentIntensity = shake.intensity * (1 - progress)
-  // 生成随机偏移
-  const offsetX = (Math.random() - 0.5) * 2 * currentIntensity
-  const offsetY = (Math.random() - 0.5) * 2 * currentIntensity * 0.5 // 垂直偏移较小
-
-  camera.value.position.set(
-    shake.originalPositions[0] + offsetX,
-    shake.originalPositions[1] + offsetY,
-    shake.originalPositions[2]
-  )
-
-  return true
-}
-
-// RPG 爆炸特效文字（BOOM!）
-const showRpgBoomEffect = (position: THREE.Vector3) => {
-  if (!camera.value) return
-
-  const vector = position.clone().project(camera.value)
-  const x = (vector.x * 0.5 + 0.5) * window.innerWidth
-  const y = (-vector.y * 0.5 + 0.5) * window.innerHeight
-
-  const boom = document.createElement('div')
-  boom.textContent = 'BOOM!'
-  boom.style.cssText = `
-    position: absolute;
-    left: ${x}px;
-    top: ${y}px;
-    transform: translate(-50%, -50%);
-    font-size: 48px;
-    font-weight: bold;
-    color: #FF4444;
-    text-shadow: 3px 3px 6px rgba(0,0,0,0.8), 0 0 30px rgba(255,68,68,0.8);
-    z-index: 1002;
-    pointer-events: none;
-    font-family: Arial, sans-serif;
-    animation: boomEffect 1s ease-out forwards;
-  `
-
-  if (!document.getElementById('boom-animation')) {
-    const style = document.createElement('style')
-    style.id = 'boom-animation'
-    style.textContent = `
-      @keyframes boomEffect {
-        0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5) rotate(-10deg); }
-        20% { opacity: 1; transform: translate(-50%, -50%) scale(1.5) rotate(5deg); }
-        40% { transform: translate(-50%, -50%) scale(1) rotate(0deg); }
-        100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8) translateY(-50px); }
-      }
-    `
-    document.head.appendChild(style)
-  }
-
-  const container = document.getElementById('game-ui') || document.body
-  container.appendChild(boom)
-
-  setTimeout(() => boom.remove(), 1000)
-}
-
-// 诊断：最近一次 RPG 爆炸信息
-let lastRpgExplosion: { x: number; z: number; enemiesInRange: number; totalEnemies: number } | null = null
-
-// RPG 火箭爆炸处理（AOE 伤害 + 弹飞效果）
-const handleRocketExplosion = (position: THREE.Vector3) => {
-  if (!enemyManagerRef.value || !scene.value) {
-    console.warn('handleRocketExplosion: enemyManagerRef or scene is null', !!enemyManagerRef.value, !!scene.value)
-    return
-  }
-
-  // 显示RPG爆炸特效
-  showRpgBoomEffect(position)
-
-  const radius = 20
-  const maxDamage = 150
-  const minDamage = 50
-
-  // 获取所有活跃敌人
-  const enemies = enemyManagerRef.value.getActiveEnemies() || []
-  let enemiesInRange = 0
-
-  for (const enemy of enemies) {
-    if (enemy.isDead) continue
-
-    // 计算敌人与爆炸中心的距离（xz 平面）
-    const dx = enemy.position.x - position.x
-    const dz = enemy.position.z - position.z
-    const dist = Math.sqrt(dx * dx + dz * dz)
-
-    if (dist <= radius) {
-      enemiesInRange++
-      // 线性衰减伤害
-      const damage = Math.round(maxDamage - (dist / radius) * (maxDamage - minDamage))
-      const finalDamage = Math.max(minDamage, Math.min(maxDamage, damage))
-
-      // 应用伤害
-      enemyManagerRef.value?.onEnemyHit(enemy.id, finalDamage)
-
-      // 弹飞效果
-      if (enemy.mesh) {
-        // 爆炸后稍延迟弹飞（让爆炸特效先出现）
-        setTimeout(() => {
-          if (enemy.mesh) {
-            RpgExplosion.createKnockback(enemy.mesh, enemy.isDead)
-          }
-        }, 50)
-      }
-    } else if (enemy.mesh) {
-      // 范围外但靠近的敌人也轻微弹飞（纯视觉效果）
-      const knockDist = radius + 1
-      if (dist <= knockDist && !enemy.isDead) {
-        setTimeout(() => {
-          if (enemy.mesh) {
-            RpgExplosion.createKnockback(enemy.mesh, false)
-          }
-        }, 80)
-      }
-    }
-  }
-
-  // 记录诊断信息
-  lastRpgExplosion = {
-    x: position.x,
-    z: position.z,
-    enemiesInRange,
-    totalEnemies: enemies.length,
-  }
-}
-
-// 射击检测
-const performRaycast = () => {
-  if (!camera.value || !scene.value) return
-
-  // Apply spread to aim point (breath hold reduces spread)
-  let spread = currentSpread.value
-  if (isHoldingBreath.value && breathStamina.value > 0) {
-    spread *= 0.2 // 80% reduction when holding breath
-  }
-  const spreadRad = (spread * Math.PI) / 180
-  const randomAngle = Math.random() * Math.PI * 2
-  const randomRadius = Math.random() * spreadRad
-  const offsetX = Math.cos(randomAngle) * randomRadius
-  const offsetY = Math.sin(randomAngle) * randomRadius
-
-  const raycaster = new THREE.Raycaster()
-  raycaster.setFromCamera(new THREE.Vector2(offsetX, offsetY), camera.value)
-
-  // 检测场景中的敌人
-  const enemyGroup = scene.value.getObjectByName('enemies')
-  if (enemyGroup && enemyManagerRef.value) {
-    const intersects = raycaster.intersectObjects(enemyGroup.children, true)
-
-    // 找到第一个命中的敌人
-    for (const intersect of intersects) {
-      // 找到敌人的根对象
-      let object: THREE.Object3D | null = intersect.object
-      while (object && object.parent !== enemyGroup) {
-        object = object.parent
-      }
-
-      if (object && object.userData) {
-        // 检查是否是敌人
-        const enemy = enemyManagerRef.value?.getActiveEnemies().find((e: any) => e.mesh === object)
-        if (enemy && !enemy.isDead) {
-          let damage = weaponStore.currentWeapon?.damage || 10
-          // 双倍伤害 Buff
-          if (buffsStore.hasBuff('doubleDamage')) {
-            damage *= 2
-          }
-          enemyManagerRef.value?.onEnemyHit(enemy.id, damage)
-
-          // 播放击中特效
-          createHitEffect(intersect.point)
-          break
-        }
-      }
-    }
-  }
-}
-
-// 创建击中特效
-const createHitEffect = (position: THREE.Vector3) => {
-  if (!scene.value) return
-
-  // 创建粒子效果
-  const particles = new THREE.Group()
-  const particleGeometry = new THREE.SphereGeometry(0.05, 8, 8)
-  const particleMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 })
-
-  for (let i = 0; i < 10; i++) {
-    const particle = new THREE.Mesh(particleGeometry, particleMaterial.clone())
-    particle.position.copy(position)
-
-    const velocity = new THREE.Vector3(
-      (Math.random() - 0.5) * 2,
-      (Math.random() - 0.5) * 2,
-      (Math.random() - 0.5) * 2
-    )
-
-    particles.add(particle)
-
-    // 动画
-    const animate = () => {
-      particle.position.add(velocity.clone().multiplyScalar(0.05))
-      velocity.multiplyScalar(0.95) // 减速
-
-      if (velocity.length() > 0.01) {
-        requestAnimationFrame(animate)
-      } else {
-        particles.remove(particle)
-        particle.geometry.dispose()
-        ;(particle.material as THREE.Material).dispose()
-      }
-    }
-
-    animate()
-  }
-
-  scene.value.add(particles)
-
-  // 1秒后自动清理
-  setTimeout(() => {
-    scene.value?.remove(particles)
-    particles.clear()
-  }, 1000)
-}
-
-// Auto fire while holding
-const updateAutoFire = (delta: number) => {
-  if (!isFiring.value) return
-
-  const weapon = weaponStore.currentWeapon
-  if (!weapon || !weapon.isAuto) return
-
-  // Keep TypeScript happy
-  void delta
-
-  const now = Date.now()
-  const fireInterval = 1000 / weapon.fireRate
-  if (now - lastFireTime.value >= fireInterval) {
-    fire()
-  }
-}
-
-// Update recoil recovery
-const updateRecoilRecovery = (delta: number) => {
-  const weapon = weaponStore.currentWeapon
-  if (!weapon) return
-
-  const now = Date.now()
-
-  // Recoil recovery
-  if (recoilOffset.value.x !== 0 || recoilOffset.value.y !== 0) {
-    const recovery = weapon.recoilRecovery * delta
-    recoilOffset.value.x *= (1 - recovery)
-    recoilOffset.value.y *= (1 - recovery)
-
-    // Snap to zero if very small
-    if (Math.abs(recoilOffset.value.x) < 0.001) recoilOffset.value.x = 0
-    if (Math.abs(recoilOffset.value.y) < 0.001) recoilOffset.value.y = 0
-  }
-
-  // Spread recovery
-  if (currentSpread.value > 0) {
-    const spreadRecovery = weapon.spreadRecovery * delta
-    currentSpread.value *= (1 - spreadRecovery)
-
-    // Snap to zero if very small
-    if (currentSpread.value < 0.01) currentSpread.value = 0
-  }
-
-  // Reset recoil pattern index if not fired for a while
-  if (now - lastFireTimeForRecoil.value > 1000) {
-    recoilIndex.value = 0
-  }
-
-  // Breath stamina management
-  if (isHoldingBreath.value && breathStamina.value > 0) {
-    // Consume stamina
-    breathStamina.value -= breathConsumptionRate * delta
-    if (breathStamina.value <= 0) {
-      breathStamina.value = 0
-      isHoldingBreath.value = false
-    }
-  } else {
-    // Recover stamina when not holding breath
-    if (breathStamina.value < maxBreathStamina) {
-      breathStamina.value += breathRecoveryRate * delta
-      if (breathStamina.value > maxBreathStamina) {
-        breathStamina.value = maxBreathStamina
-      }
-    }
-  }
-}
-
-// Update view sway (aiming sway / breathing simulation)
-const updateSway = (delta: number) => {
-  if (!camera.value) return
-
-  // Check if aiming (scope active or holding breath)
-  const isAiming = weaponStore.currentScope.isActive || isHoldingBreath.value
-  const multiplier = isAiming ? aimingSwayMultiplier : 1.0
-
-  // Update sway time
-  swayTime.value += delta * swaySpeed
-  breathingTime.value += delta * breathingSpeed
-
-  // Calculate sway offset (figure-8 pattern using sin/cos)
-  const swayX = Math.sin(swayTime.value) * swayAmount * multiplier
-  const swayY = Math.sin(swayTime.value * 0.7) * swayAmount * 0.5 * multiplier
-
-  swayOffset.value = { x: swayX, y: swayY }
-
-  // Calculate breathing sway (subtle vertical movement)
-  const breathY = Math.sin(breathingTime.value) * breathingAmount * multiplier
-  const breathX = Math.sin(breathingTime.value * 0.5) * breathingAmount * 0.3 * multiplier
-  breathingSway.value = { x: breathX, y: breathY }
-
-  // Apply sway to camera (add to yaw and pitch)
-  const baseYaw = yaw
-  const basePitch = pitch
-  yaw = baseYaw + swayOffset.value.x + breathingSway.value.x
-  pitch = basePitch + swayOffset.value.y + breathingSway.value.y
-
-  // Clamp pitch
-  pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, pitch))
-
-  camera.value.rotation.order = 'YXZ'
-  camera.value.rotation.y = yaw
-  camera.value.rotation.x = pitch
-}
-
-const updateMovement = (delta: number) => {
-  if (!camera.value) return
-
-  const direction = new THREE.Vector3()
-
-  if (keys.w) direction.z -= 1
-  if (keys.s) direction.z += 1
-  if (keys.a) direction.x -= 1
-  if (keys.d) direction.x += 1
-
-  // 计算实际速度（考虑跑动和下蹲）
-  let speed = moveSpeed
-  if (isRunning.value) speed *= 1.5  // 跑动加速
-  if (isCrouching.value) speed *= 0.5  // 下蹲减速
-
-  if (direction.length() > 0) {
-    direction.normalize()
-    direction.applyQuaternion(camera.value.quaternion)
-    direction.y = 0
-    direction.normalize()
-
-    // 在移动前保存当前位置
-    const newPosition = playerPosition.clone()
-    newPosition.x += direction.x * speed * delta
-    newPosition.z += direction.z * speed * delta
-
-    // 检查移动后的新位置是否与障碍物发生碰撞
-    if (!collisionDetector.checkCollision(newPosition)) {
-      playerPosition.copy(newPosition)
-    }
-  }
-
-  // 跳跃物理
-  if (isJumping.value) {
-    jumpVelocity.value += gravity * delta
-    playerPosition.y += jumpVelocity.value * delta
-
-    // 落地检测
-    if (playerPosition.y <= playerHeight.value) {
-      playerPosition.y = playerHeight.value
-      isJumping.value = false
-      jumpVelocity.value = 0
-    }
-  }
-
-  // 更新相机位置（使用玩家高度）
-  camera.value.position.set(playerPosition.x, playerPosition.y, playerPosition.z)
-}
-
 let lastTime = performance.now()
 
 const gameLoop = () => {
@@ -1256,43 +256,19 @@ const gameLoop = () => {
   const delta = (now - lastTime) / 1000
   lastTime = now
 
-  // 死亡或暂停时暂停所有游戏更新，只保持渲染
   if (!gameStore.isDead && !gameStore.isPaused) {
-    // 处理输入缓冲
-    inputManager.processInputBuffer()
+    // Process input buffer
+    playerInput.processInputBuffer()
 
-    updateMovement(delta)
-    updateAutoFire(delta)
-    updateRecoilRecovery(delta)
-    updateSway(delta)
+    // Update composables
+    playerMovement.update(delta)
+    shooting.update(delta)
+    cameraEffects.update(delta)
+    waveSystem.update(delta)
 
-    // 更新敌人管理器
+    // Update enemy manager
     if (enemyManagerRef.value) {
       enemyManagerRef.value?.update(delta)
-    }
-
-    // 更新火箭管理器
-    if (rocketManager) {
-      rocketManager.update(delta, playerPosition)
-    }
-
-    // 更新道具管理器
-    if (powerUpManager) {
-      powerUpManager.update(delta, performance.now() / 1000)
-    }
-
-    // 更新波次管理器（间歇倒计时）
-    if (waveManager) {
-      waveManager.update(delta)
-      // 同步间歇倒计时到 HUD
-      if (waveState.value === 'intermission') {
-        intermissionCountdown.value = waveManager.getIntermissionRemaining()
-      }
-    }
-
-    // 更新屏幕震动
-    if (cameraShake.value.active) {
-      updateCameraForShake()
     }
 
     // Update scope FOV
@@ -1323,30 +299,19 @@ const exitGame = () => {
 const showDeathScreen = computed(() => gameStore.isDead)
 
 const onRestart = () => {
-  // 重置游戏状态
   gameStore.fullReset()
-  // 重置玩家位置
   playerPosition.set(0, 1.6, 0)
-  // 重置视角
-  yaw = 0
-  pitch = 0
+  viewAngles.yaw = 0
+  viewAngles.pitch = 0
   if (camera.value) {
     camera.value.rotation.set(0, 0, 0)
   }
-  // 清理飞行中的火箭
-  rocketManager?.clear()
-  // 重置敌人系统（清理 + 重新生成）
+  shooting.dispose()
   enemyManagerRef.value?.reset()
-  // 重置所有武器弹药
   weaponStore.resetAmmo()
-  // 清理道具和 Buff
-  powerUpManager?.dispose()
-  buffsStore.clearAll()
-  // 隐藏通关界面
-  showVictoryScreen.value = false
-  // 重置波次管理器
-  waveManager?.reset()
-  // 重置时间基准，避免首帧 delta 过大
+  waveSystem.reset()
+  playerMovement.reset()
+  cameraEffects.reset()
   lastTime = performance.now()
 }
 
@@ -1398,51 +363,35 @@ watch(() => weaponStore.currentScope.isActive, (newVal) => {
 })
 
 onMounted(() => {
-  window.addEventListener('keydown', handleKeyDown)
-  window.addEventListener('keyup', handleKeyUp)
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mousedown', handleMouseDown)
-  document.addEventListener('mouseup', handleMouseUp)
-  containerRef.value?.addEventListener('contextmenu', handleContextMenu)
+  // Mount input events
+  playerInput.mount()
 
-  // 检测触摸设备
-  isTouchDevice.value = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-
-  // 初始化输入管理器按键映射
-  setupInputMappings()
-
-  // 开发环境下安装测试 API
+  // Install test API in DEV mode
   if (import.meta.env.DEV) {
     installTestApi({
       playerPosition,
-      yaw: { get: () => yaw, set: (v: number) => { yaw = v } },
-      pitch: { get: () => pitch, set: (v: number) => { pitch = v } },
+      yaw: { get: () => viewAngles.yaw, set: (v: number) => { viewAngles.yaw = v } },
+      pitch: { get: () => viewAngles.pitch, set: (v: number) => { viewAngles.pitch = v } },
       camera,
       scene,
       enemyManagerRef,
-      rocketManager: { get: () => rocketManager },
-      waveManager: { get: () => waveManager },
-      powerUpManager: { get: () => powerUpManager },
+      rocketManager: { get: () => shooting.rocketManager.get() },
+      waveManager: { get: () => waveSystem.getWaveManager() },
+      powerUpManager: { get: () => waveSystem.getPowerUpManager() },
       onRestart,
-      handleRocketExplosion,
-      fireRocket,
+      handleRocketExplosion: (pos: THREE.Vector3) => shooting.handleRocketExplosion(pos),
+      fireRocket: () => shooting.fireRocket(),
     })
   }
 
-  // Start game loop after a brief delay to ensure scene is loaded
   setTimeout(() => {
-    lastTime = performance.now() // 重置时间基准，避免首帧 delta 过大
+    lastTime = performance.now()
     gameLoop()
   }, 500)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleKeyDown)
-  window.removeEventListener('keyup', handleKeyUp)
-  document.removeEventListener('mousemove', handleMouseMove)
-  document.removeEventListener('mousedown', handleMouseDown)
-  document.removeEventListener('mouseup', handleMouseUp)
-  containerRef.value?.removeEventListener('contextmenu', handleContextMenu)
+  playerInput.unmount()
 
   if (animationId) {
     cancelAnimationFrame(animationId)
@@ -1452,12 +401,8 @@ onUnmounted(() => {
     renderer.value.dispose()
   }
 
-  // 清理火箭管理器
-  rocketManager?.clear()
-
-  // 清理波次管理器和道具管理器
-  waveManager?.dispose()
-  powerUpManager?.dispose()
+  shooting.dispose()
+  waveSystem.dispose()
 })
 
 

@@ -130,6 +130,11 @@ export class EnemyAI {
       return false
     }
 
+    // 近距离感知：2.5单位内敌人能直接发现玩家（模拟听觉/直觉）
+    if (distance < 2.5) {
+      return true
+    }
+
     // 角度检查
     directionToPlayer.normalize()
     const enemyForward = new THREE.Vector3(0, 0, 1).applyQuaternion(

@@ -52,7 +52,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     health: 100,
     moveSpeed: 3,
     viewDistance: 15,
-    viewAngle: Math.PI / 3, // 60度
+    viewAngle: Math.PI * 1.8, // ~324度，近乎全方位感知
     patrolRadius: 10,
     damage: 5, // 弹道模式下降低单发伤害，靠射速弥补
     scoreValue: 100,
@@ -69,7 +69,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     health: 200,
     moveSpeed: 5,
     viewDistance: 20,
-    viewAngle: Math.PI / 2.5, // 约72度
+    viewAngle: Math.PI * 1.8, // ~324度，近乎全方位感知
     patrolRadius: 15,
     damage: 40, // 蓄力高伤害
     scoreValue: 300,
@@ -86,7 +86,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
     health: 500,
     moveSpeed: 2,
     viewDistance: 25,
-    viewAngle: Math.PI / 2, // 90度
+    viewAngle: Math.PI * 1.8, // ~324度，近乎全方位感知
     patrolRadius: 8,
     damage: 30,
     scoreValue: 1000,

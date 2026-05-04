@@ -11,7 +11,7 @@ export const ENEMY_SHOOT_CONFIG = {
   // 最大射程（单位）
   maxRange: 20,
   // 有效射击角度（度）
-  effectiveAngle: 45,
+  effectiveAngle: 180,
 }
 
 // 障碍物接口（用于类型检查）
