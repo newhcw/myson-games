@@ -16,6 +16,8 @@ export interface EnemyConfig {
   id: string
   name: string
   type: 'soldier' | 'elite' | 'boss' | 'exploder' | 'healer'
+  // 动物名称
+  animalName: string
   health: number
   moveSpeed: number
   viewDistance: number // 视野距离
@@ -48,6 +50,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
   soldier: {
     id: 'soldier',
     name: '小兵',
+    animalName: '小兔子',
     type: 'soldier',
     health: 100,
     moveSpeed: 3,
@@ -65,6 +68,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
   elite: {
     id: 'elite',
     name: '精英',
+    animalName: '狐狸',
     type: 'elite',
     health: 200,
     moveSpeed: 5,
@@ -82,6 +86,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
   boss: {
     id: 'boss',
     name: 'BOSS',
+    animalName: '棕熊',
     type: 'boss',
     health: 500,
     moveSpeed: 2,
@@ -107,6 +112,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
   exploder: {
     id: 'exploder',
     name: '自爆兵',
+    animalName: '黄鼠狼',
     type: 'exploder',
     health: 80,
     moveSpeed: 6,
@@ -127,6 +133,7 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
   healer: {
     id: 'healer',
     name: '治疗者',
+    animalName: '猫头鹰',
     type: 'healer',
     health: 60,
     moveSpeed: 2,

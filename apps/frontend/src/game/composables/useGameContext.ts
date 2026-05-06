@@ -11,7 +11,6 @@ export interface GameContext {
   camera: ShallowRef<THREE.PerspectiveCamera | null>
   renderer: ShallowRef<THREE.WebGLRenderer | null>
   playerPosition: THREE.Vector3
-  viewAngles: ViewAngles
 }
 
 export const GAME_CONTEXT_KEY: InjectionKey<GameContext> = Symbol('game-context')

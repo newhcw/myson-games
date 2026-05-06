@@ -3,28 +3,31 @@ import * as THREE from 'three'
 // 障碍物数据接口
 export interface ObstacleData {
   id: string
-  mesh: THREE.Mesh
+  mesh: THREE.Object3D
   health: number
   maxHealth: number
   isDestroyed: boolean
+  hitPosition: THREE.Vector3
 }
 
 export class CollisionDetector {
   private colliders: THREE.Box3[] = []
   private obstacleMap: Map<string, ObstacleData> = new Map()
 
-  addCollider(mesh: THREE.Mesh, health?: number) {
+  addCollider(mesh: THREE.Object3D, health?: number, hitPosition?: THREE.Vector3) {
     const box = new THREE.Box3().setFromObject(mesh)
     this.colliders.push(box)
 
     // 如果指定了血量，注册为可破坏障碍物
     if (health !== undefined) {
+      const position = hitPosition || mesh.position.clone()
       const obstacleData: ObstacleData = {
         id: mesh.uuid,
         mesh,
         health,
         maxHealth: health,
         isDestroyed: false,
+        hitPosition: position,
       }
       this.obstacleMap.set(mesh.uuid, obstacleData)
       // 在 mesh.userData 中存储引用
@@ -65,7 +68,7 @@ export class CollisionDetector {
     for (const [uuid, obstacle] of this.obstacleMap) {
       if (obstacle.isDestroyed) continue
 
-      const distance = obstacle.mesh.position.distanceTo(position)
+      const distance = obstacle.hitPosition.distanceTo(position)
       if (distance <= radius) {
         obstacle.health -= damage
         if (obstacle.health <= 0) {

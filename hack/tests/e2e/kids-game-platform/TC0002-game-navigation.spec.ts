@@ -3,7 +3,7 @@ import { HomePage } from '../../../pages/HomePage';
 import { GamePage } from '../../../pages/GamePage';
 
 /**
- * TC0004: 点击开始游戏按钮应能启动游戏
+ * TC0004: 点击开始冒险按钮应能启动游戏
  * TC0005: 游戏页面应显示正确的 HUD 元素
  * TC0006: 游戏页面应显示初始生命值
  */
@@ -16,11 +16,14 @@ test.describe('游戏导航测试', () => {
     gamePage = new GamePage(page);
   });
 
-  test('TC0004 - 点击开始游戏按钮应能启动游戏', async ({ page }) => {
+  test('TC0004 - 点击开始冒险按钮应能启动游戏', async ({ page }) => {
     await homePage.goto();
     await homePage.expectLoaded();
 
-    // 点击开始游戏按钮（验证按钮存在且可点击）
+    // 验证开始冒险按钮文本
+    await expect(homePage.startButton).toContainText('⚔️开始冒险');
+
+    // 点击开始冒险按钮
     await homePage.startButton.click();
 
     // 验证按钮被点击（目前只打印日志，没有实际导航）
@@ -52,8 +55,8 @@ test.describe('游戏导航测试', () => {
     await gamePage.goto();
     await gamePage.waitForLoaded();
 
-    // 验证生命值标签
-    await expect(gamePage.healthLabel).toHaveText('生命值');
+    // 验证生命值图标 (❤️)
+    await expect(gamePage.healthLabel).toContainText('❤️');
 
     // 验证生命值条可见
     const healthFill = gamePage.healthFill;

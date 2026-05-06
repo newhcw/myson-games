@@ -1,5 +1,5 @@
 export interface ObstaclePreset {
-  type: 'box' | 'cylinder'
+  type: 'tree' | 'rock' | 'bush' | 'flower' | 'stump'
   size: number[]
   pos: [number, number, number]
   color: number
@@ -7,36 +7,37 @@ export interface ObstaclePreset {
   health: number
 }
 
+// 森林主题障碍物配置
 export const obstaclePresets: ObstaclePreset[] = [
-  // 大型障碍物（建筑/墙壁）- 100HP
-  { type: 'box', size: [4, 3, 1], pos: [-12, 1.5, -8], color: 0x8B7355, castShadow: true, health: 100 },
-  { type: 'box', size: [1, 3, 4], pos: [12, 1.5, -6], color: 0x8B7355, castShadow: true, health: 100 },
-  { type: 'box', size: [6, 2, 1], pos: [0, 1, -15], color: 0x6B8E23, castShadow: true, health: 100 },
+  // 大型树木 - 100HP
+  { type: 'tree', size: [0.8, 4, 0.8], pos: [-12, 2, -8], color: 0x228B22, castShadow: true, health: 100 },
+  { type: 'tree', size: [1, 5, 1], pos: [12, 2.5, -6], color: 0x006400, castShadow: true, health: 100 },
+  { type: 'tree', size: [0.7, 3.5, 0.7], pos: [0, 1.75, -15], color: 0x2E8B57, castShadow: true, health: 100 },
 
-  // 中型立方体 - 60HP
-  { type: 'box', size: [2, 2, 2], pos: [-5, 1, -5], color: 0x8B4513, castShadow: true, health: 60 },
-  { type: 'box', size: [2, 2, 2], pos: [5, 1, -8], color: 0xA0522D, castShadow: true, health: 60 },
-  { type: 'box', size: [2, 2, 2], pos: [-8, 1, 3], color: 0x8B4513, castShadow: true, health: 60 },
-  { type: 'box', size: [2, 2, 2], pos: [8, 1, 5], color: 0xA0522D, castShadow: true, health: 60 },
-  { type: 'box', size: [2, 2, 2], pos: [0, 1, -12], color: 0xCD853F, castShadow: true, health: 60 },
+  // 中型树木 - 60HP
+  { type: 'tree', size: [0.5, 2.5, 0.5], pos: [-5, 1.25, -5], color: 0x32CD32, castShadow: true, health: 60 },
+  { type: 'tree', size: [0.6, 3, 0.6], pos: [5, 1.5, -8], color: 0x3CB371, castShadow: true, health: 60 },
+  { type: 'tree', size: [0.5, 2.5, 0.5], pos: [-8, 1.25, 3], color: 0x228B22, castShadow: true, health: 60 },
+  { type: 'tree', size: [0.6, 3, 0.6], pos: [8, 1.5, 5], color: 0x2E8B57, castShadow: true, health: 60 },
+  { type: 'tree', size: [0.55, 2.8, 0.55], pos: [0, 1.4, -12], color: 0x3CB371, castShadow: true, health: 60 },
 
-  // 低矮障碍物（掩体）- 60HP
-  { type: 'box', size: [3, 1, 1.5], pos: [-3, 0.5, 0], color: 0x708090, castShadow: true, health: 60 },
-  { type: 'box', size: [3, 1, 1.5], pos: [3, 0.5, 2], color: 0x708090, castShadow: true, health: 60 },
-  { type: 'box', size: [1.5, 1, 3], pos: [0, 0.5, 5], color: 0x778899, castShadow: true, health: 60 },
+  // 灌木丛 - 60HP
+  { type: 'bush', size: [1.5, 1, 1], pos: [-3, 0.5, 0], color: 0x228B22, castShadow: true, health: 60 },
+  { type: 'bush', size: [1.5, 1, 1], pos: [3, 0.5, 2], color: 0x2E8B57, castShadow: true, health: 60 },
+  { type: 'bush', size: [1, 0.8, 1.2], pos: [0, 0.4, 5], color: 0x3CB371, castShadow: true, health: 60 },
 
-  // 圆柱形障碍物 - 60HP
-  { type: 'cylinder', size: [0.8, 0.8, 3, 16], pos: [-10, 1.5, 0], color: 0x4682B4, castShadow: true, health: 60 },
-  { type: 'cylinder', size: [0.8, 0.8, 3, 16], pos: [10, 1.5, -2], color: 0x4682B4, castShadow: true, health: 60 },
-  { type: 'cylinder', size: [1.2, 1.2, 2, 16], pos: [15, 1, 8], color: 0x5F9EA0, castShadow: true, health: 60 },
+  // 岩石 - 60HP
+  { type: 'rock', size: [1.2, 0.8, 1], pos: [-10, 0.4, 0], color: 0x696969, castShadow: true, health: 60 },
+  { type: 'rock', size: [1, 0.6, 0.8], pos: [10, 0.3, -2], color: 0x808080, castShadow: true, health: 60 },
+  { type: 'rock', size: [1.5, 1, 1.2], pos: [15, 0.5, 8], color: 0x778899, castShadow: true, health: 60 },
 
-  // 小型装饰物 - 30HP
-  { type: 'box', size: [1, 1, 1], pos: [-15, 0.5, 5], color: 0xDEB887, castShadow: true, health: 30 },
-  { type: 'box', size: [1, 1, 1], pos: [15, 0.5, -10], color: 0xDEB887, castShadow: true, health: 30 },
-  { type: 'box', size: [1.5, 0.5, 1.5], pos: [-6, 0.25, 8], color: 0x2E8B57, castShadow: false, health: 30 },
-  { type: 'box', size: [1.5, 0.5, 1.5], pos: [7, 0.25, -15], color: 0x2E8B57, castShadow: false, health: 30 },
+  // 小花丛 - 30HP
+  { type: 'flower', size: [0.5, 0.3, 0.5], pos: [-15, 0.15, 5], color: 0xFF69B4, castShadow: false, health: 30 },
+  { type: 'flower', size: [0.5, 0.3, 0.5], pos: [15, 0.15, -10], color: 0xFF1493, castShadow: false, health: 30 },
+  { type: 'flower', size: [0.6, 0.25, 0.6], pos: [-6, 0.125, 8], color: 0xFFD700, castShadow: false, health: 30 },
+  { type: 'flower', size: [0.6, 0.25, 0.6], pos: [7, 0.125, -15], color: 0xFF6347, castShadow: false, health: 30 },
 
-  // 中央区域障碍物 - 60HP
-  { type: 'box', size: [2, 1.5, 2], pos: [-2, 0.75, -3], color: 0xB8860B, castShadow: true, health: 60 },
-  { type: 'box', size: [2, 1.5, 2], pos: [2, 0.75, -4], color: 0xB8860B, castShadow: true, health: 60 },
+  // 树桩 - 60HP
+  { type: 'stump', size: [0.6, 0.8, 0.6], pos: [-2, 0.4, -3], color: 0x8B4513, castShadow: true, health: 60 },
+  { type: 'stump', size: [0.6, 0.8, 0.6], pos: [2, 0.4, -4], color: 0xA0522D, castShadow: true, health: 60 },
 ]

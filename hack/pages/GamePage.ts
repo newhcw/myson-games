@@ -36,7 +36,7 @@ export class GamePage {
     this.hud = page.locator('.hud')
     this.healthBar = page.locator('.health-bar')
     this.healthFill = page.locator('.health-bar .fill')
-    this.healthLabel = page.locator('.health-bar .label')
+    this.healthLabel = page.locator('.health-bar .health-icon')
     this.score = page.locator('.score span').first()
     this.scoreDisplay = page.locator('.score')
     this.kills = page.locator('.score .kills')

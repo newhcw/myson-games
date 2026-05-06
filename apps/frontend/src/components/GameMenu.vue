@@ -49,8 +49,7 @@
       <!-- 主菜单按钮 -->
       <div class="menu-buttons">
         <button class="menu-button start-button" @click="startGame">
-          <span class="btn-icon">⚔️</span>
-          <span class="button-text">开始冒险</span>
+          <span class="button-text">⚔️开始冒险</span>
           <span class="btn-shine"></span>
         </button>
 

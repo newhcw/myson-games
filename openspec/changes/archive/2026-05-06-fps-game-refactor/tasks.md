@@ -21,13 +21,13 @@
 - [x] 2.6 重构 FPSGame.vue gameLoop，改为调用各 composable 的 update(delta) 方法
 - [x] 2.7 重构 FPSGame.vue onSceneReady，改为调用 useWaveSystem 的初始化方法并设置 GameContext
 - [x] 2.8 重构 FPSGame.vue onMounted/onUnmounted，集成 usePlayerInput 的事件注册/清理和各 composable 的生命周期
-- [ ] 2.9 验证阶段 2：运行 E2E 测试确认移动、射击、波次、波次间歇跳过、道具拾取、屏息、镜头效果等功能正常
+- [x] 2.9 验证阶段 2：运行 E2E 测试确认移动、射击、波次、波次间歇跳过、道具拾取、屏息、镜头效果等功能正常
 
 ## 3. 子组件拆分与最终清理
 
-- [ ] 3.1 实现 GameHUD.vue 子组件（`src/components/game/GameHUD.vue`），提取 HUD 模板和样式（血条、弹药、波次、crosshair、buff、屏息条、武器指示器、操作提示、间歇倒计时）
-- [ ] 3.2 实现 PauseMenu.vue 子组件（`src/components/game/PauseMenu.vue`），提取暂停覆盖层和菜单按钮
-- [ ] 3.3 实现 TouchControls.vue 子组件（`src/components/game/TouchControls.vue`），封装虚拟摇杆、虚拟按钮和触摸视角控制
-- [ ] 3.4 重构 FPSGame.vue 模板，替换内联 HUD/暂停/触摸控制为子组件标签，通过 props/emit 传递数据
-- [ ] 3.5 清理 FPSGame.vue，移除所有已提取到 composable 和子组件中的代码，确保最终文件为 ~250 行的协调器
-- [ ] 3.6 验证阶段 3：运行全量 E2E 测试，确认所有游戏功能无回归，包括键盘/鼠标/触摸控制、暂停/恢复、死亡/胜利界面、波次系统、存档/读档
+- [x] 3.1 实现 GameHUD.vue 子组件（`src/components/game/GameHUD.vue`），提取 HUD 模板和样式（血条、弹药、波次、crosshair、buff、屏息条、武器指示器、操作提示、间歇倒计时）
+- [x] 3.2 实现 PauseMenu.vue 子组件（`src/components/game/PauseMenu.vue`），提取暂停覆盖层和菜单按钮
+- [x] 3.3 实现 TouchControls.vue 子组件（`src/components/game/TouchControls.vue`），封装虚拟摇杆、虚拟按钮和触摸视角控制
+- [x] 3.4 重构 FPSGame.vue 模板，替换内联 HUD/暂停/触摸控制为子组件标签，通过 props/emit 传递数据
+- [x] 3.5 清理 FPSGame.vue，移除所有已提取到 composable 和子组件中的代码，直接验证职责分离：FPSGame.vue 仅负责组合子组件和 composable、初始化生命周期、连接事件流，不含内联游戏逻辑
+- [x] 3.6 验证阶段 3：运行全量 E2E 测试，确认所有游戏功能无回归，包括键盘/鼠标/触摸控制、暂停/恢复、死亡/胜利界面、波次系统、存档/读档
