@@ -448,6 +448,7 @@ onUnmounted(() => {
       :breath-stamina="breathStamina"
       :max-breath-stamina="maxBreathStamina"
       :is-scope-active="weaponStore.currentScope.isActive"
+      @exit="exitGame"
     />
 
     <!-- 触摸屏虚拟控制 -->
@@ -462,7 +463,6 @@ onUnmounted(() => {
       @touch-look-end="onTouchLookEnd"
     />
 
-    <button class="exit-btn" @click.stop="exitGame">退出游戏</button>
     <!-- 暂停菜单 -->
     <PauseMenu
       :visible="gameStore.isPaused"
@@ -523,28 +523,5 @@ onUnmounted(() => {
 @keyframes bounce {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-24px); }
-}
-
-.exit-btn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  padding: 6px 16px;
-  background: rgba(229, 57, 53, 0.85);
-  color: #FFF8E1;
-  border-radius: 14px;
-  font-weight: 700;
-  font-size: 14px;
-  pointer-events: auto;
-  cursor: pointer;
-  transition: all 0.2s;
-  z-index: 100;
-  border: 2px solid rgba(255, 205, 210, 0.3);
-}
-
-.exit-btn:hover {
-  background: #E53935;
-  transform: scale(1.05);
-  box-shadow: 0 0 16px rgba(229, 57, 53, 0.4);
 }
 </style>
