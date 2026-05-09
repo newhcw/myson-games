@@ -9,9 +9,10 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import * as THREE from 'three'
 import { enemyAI } from '@/game/enemies/EnemyAI'
 import { ProjectileManager } from '@/game/enemies/ProjectileManager'
-import type { PowerUpManager } from '@/game/powerups/PowerUpManager'
+import { PowerUpManager } from '@/game/powerups/PowerUpManager'
 import { DROP_RATES, BOSS_DROP_COUNT } from '@/game/powerups/types'
 import type { EnemyTypeKeyword } from '@/game/wave/types'
+import { soundManager } from '@/game/sound/SoundManager'
 
 interface Props {
   scene: THREE.Scene
@@ -65,7 +66,7 @@ const spawnEnemies = (
 /**
  * 敌人击杀时触发道具掉落判定（Task 4.3）
  */
-const handleEnemyDrop = (enemyId: string): void => {
+const handleEnemyDrop = (enemyId: string, position: THREE.Vector3): void => {
   if (!powerUpManager) return
 
   const enemyType = enemyTypes.get(enemyId)
@@ -73,11 +74,7 @@ const handleEnemyDrop = (enemyId: string): void => {
 
   const dropRate = DROP_RATES[enemyType] || 0
   const dropCount = enemyType === 'boss' ? BOSS_DROP_COUNT : 1
-
-  // 获取敌人位置
-  const enemy = enemyAI.getActiveEnemies().find((e: any) => e.id === enemyId)
-  if (!enemy) return
-  const pos = enemy.position.clone()
+  const pos = position.clone()
 
   for (let i = 0; i < dropCount; i++) {
     if (Math.random() < dropRate) {
@@ -88,6 +85,10 @@ const handleEnemyDrop = (enemyId: string): void => {
         (Math.random() - 0.5) * 1.5
       )
       powerUpManager.spawn({ type: randomType, position: pos.clone().add(offset) })
+      // 播放道具掉落音效（音量适中，避免每个道具都播放）
+      if (i === 0) {
+        soundManager.playPowerUpDrop()
+      }
     }
   }
 }
@@ -114,10 +115,14 @@ const update = (delta: number) => {
 
 // 处理敌人受伤
 const onEnemyHit = (enemyId: string, damage: number): boolean => {
+  const enemy = enemyAI.getActiveEnemies().find((e: any) => e.id === enemyId)
+  // 在 enemyHit 之前保存位置（enemyHit 会将敌人标记为 dead，之后 getActiveEnemies 找不到它）
+  const enemyPos = enemy?.position?.clone?.()
+
   const result = enemyAI.enemyHit(enemyId, damage)
 
   if (result.killed) {
-    const score = enemyAI.getActiveEnemies().find((e: any) => e.id === enemyId)?.config?.scoreValue || 100
+    const score = enemy?.config?.scoreValue || 100
     emit('enemy-killed', enemyId, score)
 
     // 从追踪列表中移除
@@ -126,8 +131,10 @@ const onEnemyHit = (enemyId: string, damage: number): boolean => {
       enemies.splice(index, 1)
     }
 
-    // 道具掉落
-    handleEnemyDrop(enemyId)
+    // 道具掉落（使用预先保存的位置）
+    if (enemyPos) {
+      handleEnemyDrop(enemyId, enemyPos)
+    }
 
     // 通知波次管理器
     onEnemyKilledCallback?.(enemyId)

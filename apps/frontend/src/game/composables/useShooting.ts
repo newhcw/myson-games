@@ -76,6 +76,15 @@ export function useShooting(deps: ShootingDeps) {
     }
   }
 
+  const startFiring = () => {
+    isFiring.value = true
+    fire()
+  }
+
+  const stopFiring = () => {
+    isFiring.value = false
+  }
+
   const fireRocket = () => {
     if (!camera.value) return
 
@@ -327,6 +336,8 @@ export function useShooting(deps: ShootingDeps) {
   return {
     isFiring,
     fire,
+    startFiring,
+    stopFiring,
     fireRocket,
     rocketManager: { get: () => rocketManager },
     update,

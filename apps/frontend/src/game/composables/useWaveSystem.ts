@@ -6,6 +6,7 @@ import type { WaveState, EnemyTypeKeyword } from '@/game/wave/types'
 import { useGameStore } from '@/stores/game'
 import { useWeaponStore } from '@/stores/weapon'
 import { useBuffsStore } from '@/stores/buffs'
+import { dropHint } from '@/game/ui/DropHint'
 
 export function useWaveSystem() {
   const gameStore = useGameStore()
@@ -93,6 +94,7 @@ export function useWaveSystem() {
       onHealthPickup: (amount: number) => {
         const newHealth = Math.min(gameStore.maxHealth, gameStore.health + amount)
         gameStore.health = newHealth
+        dropHint.showHealthPickup()
       },
       onAmmoPickup: () => {
         const weapon = weaponStore.currentWeapon
@@ -102,9 +104,11 @@ export function useWaveSystem() {
           ammoData.current = weapon.magazineSize
           weaponStore.ammo.set(weapon.id, { ...ammoData })
         }
+        dropHint.showAmmoPickup()
       },
       onDoubleDamagePickup: (duration: number) => {
         buffsStore.addBuff('doubleDamage', duration)
+        dropHint.showDoubleDamage()
       },
     })
 

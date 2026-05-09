@@ -16,6 +16,7 @@ interface TestApiContext {
   onRestart: () => void
   handleRocketExplosion: (pos: THREE.Vector3) => void
   fireRocket: () => void
+  fire: () => void
 }
 
 export function installTestApi(ctx: TestApiContext) {
@@ -303,6 +304,63 @@ export function installTestApi(ctx: TestApiContext) {
     // 获取 Buff 状态
     hasBuff: (type: string) => {
       return buffsStore.hasBuff(type)
+    },
+
+    // 获取武器信息
+    getWeaponInfo: () => {
+      const weapon = weaponStore.currentWeapon
+      if (!weapon) return null
+      const ammoData = weaponStore.ammo.get(weapon.id)
+      return {
+        type: weapon.type,
+        ammo: ammoData?.current ?? 0,
+        maxAmmo: weapon.magazineSize,
+        isAuto: weapon.isAuto,
+        fireRate: weapon.fireRate,
+      }
+    },
+
+    // 切换武器
+    switchWeapon: (index: number) => {
+      weaponStore.switchWeapon(index)
+      return true
+    },
+
+    // 生成道具到玩家位置并自动拾取
+    spawnAndPickupPowerUp: (type: string) => {
+      const powerUpManager = ctx.powerUpManager.get()
+      if (!powerUpManager) return false
+      const pos = ctx.playerPosition.clone().add(new THREE.Vector3(0.5, 0, 0))
+      powerUpManager.spawn({ type, position: pos })
+      // 强制更新以触发拾取检测
+      powerUpManager.update(0.016, Date.now())
+      return true
+    },
+
+    // 直接触发一次射击
+    triggerFire: () => {
+      if (ctx.fire) {
+        ctx.fire()
+      }
+      return true
+    },
+
+    // 注册射击函数供测试调用
+    _setShootingFire: (fireFn: () => void) => {
+      const testApi = (window as any).__testApi
+      if (testApi) {
+        testApi._shootingFire = fireFn
+      }
+      return true
+    },
+
+    // 生成道具到玩家位置
+    spawnPowerUp: (type: string) => {
+      const powerUpManager = ctx.powerUpManager.get()
+      if (!powerUpManager) return false
+      const pos = ctx.playerPosition.clone().add(new THREE.Vector3(2, 0, 0))
+      powerUpManager.spawn({ type, position: pos })
+      return true
     },
   }
 }

@@ -10,6 +10,8 @@ import type { ViewAngles } from './useGameContext'
 
 export interface PlayerInputCallbacks {
   onShoot: () => void
+  onShootStart: () => void
+  onShootStop: () => void
   onJump: () => void
   onToggleCrouch: () => void
   onReload: () => void
@@ -60,7 +62,7 @@ export function usePlayerInput(
   const onVirtualButtonPress = (type: string) => {
     switch (type) {
       case 'shoot':
-        callbacks.onShoot()
+        callbacks.onShootStart()
         break
       case 'jump':
         callbacks.onJump()
@@ -77,8 +79,10 @@ export function usePlayerInput(
     }
   }
 
-  const onVirtualButtonRelease = () => {
-    // No-op for now
+  const onVirtualButtonRelease = (type: string) => {
+    if (type === 'shoot') {
+      callbacks.onShootStop()
+    }
   }
 
   const onTouchLookStart = (e: TouchEvent) => {
@@ -202,12 +206,26 @@ export function usePlayerInput(
     const shootButton = buttonMap[shootKey] ?? 0
 
     if (e.button === shootButton) {
-      callbacks.onShoot()
+      callbacks.onShootStart()
     }
   }
 
-  const handleMouseUp = (_e: MouseEvent) => {
-    // No-op for now
+  const handleMouseUp = (e: MouseEvent) => {
+    const savedBindings = localStorage.getItem('game-key-bindings')
+    let shootKey = 'mouseleft'
+    if (savedBindings) {
+      try {
+        const bindings = JSON.parse(savedBindings)
+        shootKey = bindings['shoot'] || 'mouseleft'
+      } catch { /* ignore */ }
+    }
+
+    const buttonMap: Record<string, number> = { mouseleft: 0, mouseright: 2 }
+    const shootButton = buttonMap[shootKey] ?? 0
+
+    if (e.button === shootButton) {
+      callbacks.onShootStop()
+    }
   }
 
   const handleContextMenu = (e: MouseEvent) => {
@@ -285,6 +303,12 @@ export function usePlayerInput(
   }
 
   // ========== Lifecycle ==========
+  const handlePointerLockChange = () => {
+    if (document.pointerLockElement !== containerRef.value) {
+      callbacks.onShootStop()
+    }
+  }
+
   const mount = () => {
     isTouchDevice.value = 'ontouchstart' in window || navigator.maxTouchPoints > 0
     setupInputMappings()
@@ -294,6 +318,7 @@ export function usePlayerInput(
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mousedown', handleMouseDown)
     document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('pointerlockchange', handlePointerLockChange)
     containerRef.value?.addEventListener('contextmenu', handleContextMenu)
   }
 
@@ -303,6 +328,7 @@ export function usePlayerInput(
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mousedown', handleMouseDown)
     document.removeEventListener('mouseup', handleMouseUp)
+    document.removeEventListener('pointerlockchange', handlePointerLockChange)
     containerRef.value?.removeEventListener('contextmenu', handleContextMenu)
   }
 

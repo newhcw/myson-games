@@ -213,6 +213,46 @@ export class SoundManager {
   }
 
   /**
+   * 道具掉落音效 - 轻快的上升音调
+   */
+  playPowerUpDrop() {
+    if (!this.audioContext || !this.masterGain) return
+
+    const now = this.audioContext.currentTime
+
+    // 第一个音符 - 上升音
+    const osc = this.audioContext.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(400, now)
+    osc.frequency.exponentialRampToValueAtTime(800, now + 0.1)
+
+    const gain = this.audioContext.createGain()
+    gain.gain.setValueAtTime(0.3, now)
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15)
+
+    osc.connect(gain)
+    gain.connect(this.masterGain)
+
+    osc.start(now)
+    osc.stop(now + 0.15)
+
+    // 第二个音符 - 确认声
+    const osc2 = this.audioContext.createOscillator()
+    osc2.type = 'sine'
+    osc2.frequency.setValueAtTime(1000, now + 0.1)
+
+    const gain2 = this.audioContext.createGain()
+    gain2.gain.setValueAtTime(0.2, now + 0.1)
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.2)
+
+    osc2.connect(gain2)
+    gain2.connect(this.masterGain)
+
+    osc2.start(now + 0.1)
+    osc2.stop(now + 0.2)
+  }
+
+  /**
    * 创建噪音源
    */
   private createNoise(duration: number): AudioBufferSourceNode {

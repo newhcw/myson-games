@@ -16,6 +16,7 @@ import { useWeaponStore } from '@/stores/weapon'
 import { useGameStore } from '@/stores/game'
 import { soundManager } from '@/game/sound/SoundManager'
 import { damageFeedback } from '@/game/ui/DamageFeedback'
+import { dropHint } from '@/game/ui/DropHint'
 import DeathScreen from '@/game/ui/DeathScreen.vue'
 import VictoryScreen from '@/game/ui/VictoryScreen.vue'
 import { installTestApi } from '@/game/test/testApi'
@@ -165,6 +166,8 @@ const resumeGameAndLock = async () => {
 // Fill input callbacks (now all composable refs are available)
 Object.assign(inputCallbacks, {
   onShoot: () => shooting.fire(),
+  onShootStart: () => shooting.startFiring(),
+  onShootStop: () => shooting.stopFiring(),
   onJump: () => playerMovement.jump(),
   onToggleCrouch: () => playerMovement.toggleCrouch(),
   onReload: () => weaponStore.reload(),
@@ -220,6 +223,9 @@ const onSceneReady = (
   // Unblock EnemyManager mount so the watch inside waveSystem.init()
   // can pick up enemyManagerRef and start the game.
   isLoading.value = false
+
+  // 显示游戏开始提示
+  dropHint.showGameStartHint()
 }
 
 // 处理玩家被击中
@@ -371,6 +377,7 @@ onMounted(() => {
       onRestart,
       handleRocketExplosion: (pos: THREE.Vector3) => shooting.handleRocketExplosion(pos),
       fireRocket: () => shooting.fireRocket(),
+      fire: () => shooting.fire(),
     })
   }
 

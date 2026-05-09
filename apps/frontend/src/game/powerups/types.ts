@@ -9,7 +9,7 @@ export type PowerUpType = 'health' | 'ammo' | 'doubleDamage'
 
 /** 道具掉落概率配置 */
 export const DROP_RATES: Record<string, number> = {
-  soldier: 0.20,  // 小兵 20%
+  soldier: 0.50,  // 小兵 50%
   elite:   0.50,  // 精英 50%
   boss:    1.00,  // BOSS 100%
 }
