@@ -230,7 +230,7 @@ defineExpose({
     powerUpManager?.dispose()
     enemies = []
     enemyTypes.clear()
-    onEnemyKilledCallback = null
+    // 不清除 onEnemyKilledCallback，因为它是外部传入的回调，重置后会由 useWaveSystem 重新设置
   },
   getActiveEnemies: () => enemyAI.getActiveEnemies(),
   getHealthBarCount: () => enemyAI.getHealthBarCount(),

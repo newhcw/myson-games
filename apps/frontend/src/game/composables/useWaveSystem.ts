@@ -16,6 +16,7 @@ export function useWaveSystem() {
   let waveManager: WaveManager | null = null
   let powerUpManager: PowerUpManager | null = null
   let enemyManagerRef: Ref<any>
+  let sceneObj: THREE.Scene | null = null  // 保存 scene 引用用于 reset
 
   const currentWave = ref(1)
   const waveState = ref<WaveState>('waving')
@@ -52,13 +53,22 @@ export function useWaveSystem() {
 
   // ====== Init wave system ======
   const init = (
-    sceneObj: THREE.Scene,
+    scene: THREE.Scene,
     enemyManager: Ref<any>,
     loadFromSave: () => boolean,
   ) => {
+    sceneObj = scene  // 保存 scene 引用
     enemyManagerRef = enemyManager
 
     waveManager = new WaveManager()
+
+    // 立即设置击杀回调，解决回调设置时机问题导致的bug
+    if (enemyManagerRef.value) {
+      enemyManagerRef.value.setOnEnemyKilled((enemyId: string) => {
+        waveManager?.onEnemyKilled(enemyId)
+      })
+      enemyManagerRef.value.setPowerUpManager(powerUpManager)
+    }
     waveManager.setCallbacks({
       onWaveStart: (waveNumber: number) => {
         currentWave.value = waveNumber
@@ -166,8 +176,42 @@ export function useWaveSystem() {
   const reset = () => {
     waveManager?.reset()
     powerUpManager?.dispose()
+    // 重新创建 powerUpManager
+    powerUpManager = new PowerUpManager()
+    if (sceneObj) {
+      powerUpManager.setScene(sceneObj)
+      powerUpManager.setCallbacks({
+        onHealthPickup: (amount: number) => {
+          const newHealth = Math.min(gameStore.maxHealth, gameStore.health + amount)
+          gameStore.health = newHealth
+          dropHint.showHealthPickup()
+        },
+        onAmmoPickup: () => {
+          const weapon = weaponStore.currentWeapon
+          if (!weapon) return
+          const ammoData = weaponStore.ammo.get(weapon.id)
+          if (ammoData) {
+            ammoData.current = weapon.magazineSize
+            weaponStore.ammo.set(weapon.id, { ...ammoData })
+          }
+          dropHint.showAmmoPickup()
+        },
+        onDoubleDamagePickup: (duration: number) => {
+          buffsStore.addBuff('doubleDamage', duration)
+          dropHint.showDoubleDamage()
+        },
+      })
+    }
     buffsStore.clearAll()
     showVictoryScreen.value = false
+
+    // 重新设置击杀回调
+    if (enemyManagerRef.value && waveManager) {
+      enemyManagerRef.value.setOnEnemyKilled((enemyId: string) => {
+        waveManager?.onEnemyKilled(enemyId)
+      })
+      enemyManagerRef.value.setPowerUpManager(powerUpManager)
+    }
   }
 
   const dispose = () => {
