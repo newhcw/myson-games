@@ -10,26 +10,26 @@ export interface ObstaclePreset {
 // 森林主题障碍物配置
 export const obstaclePresets: ObstaclePreset[] = [
   // 大型树木 - 100HP
-  { type: 'tree', size: [0.8, 4, 0.8], pos: [-12, 0, -8], color: 0x228B22, castShadow: true, health: 100 },
-  { type: 'tree', size: [1, 5, 1], pos: [12, 0, -6], color: 0x006400, castShadow: true, health: 100 },
-  { type: 'tree', size: [0.7, 3.5, 0.7], pos: [0, 0, -15], color: 0x2E8B57, castShadow: true, health: 100 },
+  { type: 'tree', size: [0.8, 14, 0.8], pos: [-12, 0, -8], color: 0x228B22, castShadow: true, health: 100 },
+  { type: 'tree', size: [1, 18, 1], pos: [12, 0, -6], color: 0x006400, castShadow: true, health: 100 },
+  { type: 'tree', size: [0.7, 12, 0.7], pos: [0, 0, -15], color: 0x2E8B57, castShadow: true, health: 100 },
 
   // 中型树木 - 60HP
-  { type: 'tree', size: [0.5, 2.5, 0.5], pos: [-5, 0, -5], color: 0x32CD32, castShadow: true, health: 60 },
-  { type: 'tree', size: [0.6, 3, 0.6], pos: [5, 0, -8], color: 0x3CB371, castShadow: true, health: 60 },
-  { type: 'tree', size: [0.5, 2.5, 0.5], pos: [-8, 0, 3], color: 0x228B22, castShadow: true, health: 60 },
-  { type: 'tree', size: [0.6, 3, 0.6], pos: [8, 0, 5], color: 0x2E8B57, castShadow: true, health: 60 },
-  { type: 'tree', size: [0.55, 2.8, 0.55], pos: [0, 0, -12], color: 0x3CB371, castShadow: true, health: 60 },
+  { type: 'tree', size: [0.5, 7, 0.5], pos: [-5, 0, -5], color: 0x32CD32, castShadow: true, health: 60 },
+  { type: 'tree', size: [0.6, 9, 0.6], pos: [5, 0, -8], color: 0x3CB371, castShadow: true, health: 60 },
+  { type: 'tree', size: [0.5, 8, 0.5], pos: [-8, 0, 3], color: 0x228B22, castShadow: true, health: 60 },
+  { type: 'tree', size: [0.6, 10, 0.6], pos: [8, 0, 5], color: 0x2E8B57, castShadow: true, health: 60 },
+  { type: 'tree', size: [0.55, 8, 0.55], pos: [0, 0, -12], color: 0x3CB371, castShadow: true, health: 60 },
 
   // 灌木丛 - 60HP
-  { type: 'bush', size: [1.5, 1, 1], pos: [-3, 0, 0], color: 0x228B22, castShadow: true, health: 60 },
-  { type: 'bush', size: [1.5, 1, 1], pos: [3, 0, 2], color: 0x2E8B57, castShadow: true, health: 60 },
-  { type: 'bush', size: [1, 0.8, 1.2], pos: [0, 0, 5], color: 0x3CB371, castShadow: true, health: 60 },
+  { type: 'bush', size: [1.5, 1.8, 1], pos: [-3, 0, 0], color: 0x228B22, castShadow: true, health: 60 },
+  { type: 'bush', size: [1.5, 2, 1], pos: [3, 0, 2], color: 0x2E8B57, castShadow: true, health: 60 },
+  { type: 'bush', size: [1, 1.5, 1.2], pos: [0, 0, 5], color: 0x3CB371, castShadow: true, health: 60 },
 
   // 岩石 - 60HP
-  { type: 'rock', size: [1.2, 0.8, 1], pos: [-10, 0, 0], color: 0x696969, castShadow: true, health: 60 },
-  { type: 'rock', size: [1, 0.6, 0.8], pos: [10, 0, -2], color: 0x808080, castShadow: true, health: 60 },
-  { type: 'rock', size: [1.5, 1, 1.2], pos: [15, 0, 8], color: 0x778899, castShadow: true, health: 60 },
+  { type: 'rock', size: [1.2, 2, 1], pos: [-10, 0, 0], color: 0x696969, castShadow: true, health: 60 },
+  { type: 'rock', size: [1, 1.5, 0.8], pos: [10, 0, -2], color: 0x808080, castShadow: true, health: 60 },
+  { type: 'rock', size: [1.5, 3, 1.2], pos: [15, 0, 8], color: 0x778899, castShadow: true, health: 60 },
 
   // 小花丛 - 30HP
   { type: 'flower', size: [0.5, 0.3, 0.5], pos: [-15, 0, 5], color: 0xFF69B4, castShadow: false, health: 30 },
@@ -38,6 +38,6 @@ export const obstaclePresets: ObstaclePreset[] = [
   { type: 'flower', size: [0.6, 0.25, 0.6], pos: [7, 0, -15], color: 0xFF6347, castShadow: false, health: 30 },
 
   // 树桩 - 60HP
-  { type: 'stump', size: [0.6, 0.8, 0.6], pos: [-2, 0, -3], color: 0x8B4513, castShadow: true, health: 60 },
-  { type: 'stump', size: [0.6, 0.8, 0.6], pos: [2, 0, -4], color: 0xA0522D, castShadow: true, health: 60 },
+  { type: 'stump', size: [0.6, 1.2, 0.6], pos: [-2, 0, -3], color: 0x8B4513, castShadow: true, health: 60 },
+  { type: 'stump', size: [0.6, 1.5, 0.6], pos: [2, 0, -4], color: 0xA0522D, castShadow: true, health: 60 },
 ]

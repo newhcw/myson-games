@@ -28,14 +28,6 @@ export interface WaveCallbacks {
   onAllWavesComplete: () => void
 }
 
-/** 刷新点坐标（4 个角落） */
-export const SPAWN_POINTS = [
-  { x: -20, z: -20 },
-  { x:  20, z: -20 },
-  { x: -20, z:  20 },
-  { x:  20, z:  20 },
-] as const
-
 /** 总波次数 */
 export const TOTAL_WAVES = 10
 

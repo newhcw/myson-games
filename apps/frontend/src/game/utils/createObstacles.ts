@@ -25,7 +25,7 @@ function createTreeMesh(preset: ObstaclePreset): THREE.Group {
   const group = new THREE.Group()
 
   const [rTop, , height] = preset.size
-  const trunkHeight = height * 0.4
+  const trunkHeight = height * 0.5
   const foliageHeight = height * 0.7
 
   // 树干
@@ -38,7 +38,7 @@ function createTreeMesh(preset: ObstaclePreset): THREE.Group {
 
   // 树冠（3层圆锥叠加）
   const foliageColors = [preset.color, adjustColor(preset.color, -20), adjustColor(preset.color, 20)]
-  const foliageSizes = [rTop * 1.2, rTop * 0.9, rTop * 0.6]
+  const foliageSizes = [rTop * 1.0, rTop * 0.75, rTop * 0.5]
   const foliageHeights = [foliageHeight * 0.3, foliageHeight * 0.6, foliageHeight * 0.9]
 
   foliageSizes.forEach((size, i) => {

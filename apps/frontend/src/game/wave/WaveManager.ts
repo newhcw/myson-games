@@ -4,7 +4,7 @@
  */
 
 import type { WaveConfig, WaveState, WaveCallbacks, WaveEnemyConfig } from './types'
-import { SPAWN_POINTS, TOTAL_WAVES, INTERMISSION_DURATION, type EnemyTypeKeyword } from './types'
+import { TOTAL_WAVES, INTERMISSION_DURATION, type EnemyTypeKeyword } from './types'
 
 // ============================================================
 // 波次配置表
@@ -178,5 +178,5 @@ export class WaveManager {
 
 }
 
-export { SPAWN_POINTS, TOTAL_WAVES, INTERMISSION_DURATION } from './types'
+export { TOTAL_WAVES, INTERMISSION_DURATION } from './types'
 

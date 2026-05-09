@@ -1,6 +1,7 @@
 import { ref, type ShallowRef } from 'vue'
 import * as THREE from 'three'
 import { collisionDetector } from '@/game/utils/Collision'
+import { clampToSafeArea } from '@/game/utils/areaRestriction'
 
 export interface PlayerMovementState {
   keys: { w: boolean; a: boolean; s: boolean; d: boolean }
@@ -52,6 +53,10 @@ export function usePlayerMovement(
       if (!collisionDetector.checkCollision(newPosition)) {
         playerPosition.copy(newPosition)
       }
+
+      const clamped = clampToSafeArea(playerPosition.x, playerPosition.z)
+      playerPosition.x = clamped.x
+      playerPosition.z = clamped.z
     }
 
     if (isJumping.value) {

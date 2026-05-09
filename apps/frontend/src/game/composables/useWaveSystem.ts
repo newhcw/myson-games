@@ -1,12 +1,13 @@
 import { ref, computed, watch, type Ref } from 'vue'
 import * as THREE from 'three'
-import { WaveManager, WAVE_CONFIGS, SPAWN_POINTS, INTERMISSION_DURATION, TOTAL_WAVES } from '@/game/wave/WaveManager'
+import { WaveManager, WAVE_CONFIGS, INTERMISSION_DURATION, TOTAL_WAVES } from '@/game/wave/WaveManager'
 import { PowerUpManager } from '@/game/powerups/PowerUpManager'
 import type { WaveState, EnemyTypeKeyword } from '@/game/wave/types'
 import { useGameStore } from '@/stores/game'
 import { useWeaponStore } from '@/stores/weapon'
 import { useBuffsStore } from '@/stores/buffs'
 import { dropHint } from '@/game/ui/DropHint'
+import { findSafeSpawnPosition, MIN_SPAWN_DISTANCE } from '@/game/utils/areaRestriction'
 
 export function useWaveSystem() {
   const gameStore = useGameStore()
@@ -34,11 +35,17 @@ export function useWaveSystem() {
     const config = WAVE_CONFIGS[waveNumber - 1]
     if (!config) return
 
-    const shuffled = [...SPAWN_POINTS].sort(() => Math.random() - 0.5)
     const pointCount = 2 + Math.floor(Math.random() * 2)
-    const selectedPoints = shuffled.slice(0, pointCount).map(
-      (p) => new THREE.Vector3(p.x, 0, p.z),
-    )
+    const selectedPoints: THREE.Vector3[] = []
+
+    const existingEnemies = enemyManagerRef.value.getActiveEnemies() || []
+    const existingPositions = existingEnemies.map((e: any) => ({ x: e.mesh.position.x, z: e.mesh.position.z }))
+
+    for (let i = 0; i < pointCount; i++) {
+      const pos = findSafeSpawnPosition(existingPositions, MIN_SPAWN_DISTANCE, 50)
+      selectedPoints.push(pos)
+      existingPositions.push({ x: pos.x, z: pos.z })
+    }
 
     const configs: { type: EnemyTypeKeyword; count: number }[] = []
     config.enemies.forEach((e) => {
