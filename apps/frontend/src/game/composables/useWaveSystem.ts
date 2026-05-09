@@ -108,7 +108,8 @@ export function useWaveSystem() {
       },
     })
 
-    // Watch for EnemyManager mount
+    // Watch for EnemyManager mount — no immediate:true since ref is
+    // null at init() time (EnemyManager mounts after isLoading=false).
     const stopWatch = watch(enemyManagerRef, (mgr) => {
       if (mgr && waveManager) {
         mgr.setOnEnemyKilled((enemyId: string) => {
@@ -118,7 +119,16 @@ export function useWaveSystem() {
         waveManager.startGame()
         stopWatch()
       }
-    }, { immediate: true })
+    })
+
+    // Fallback for hot-reload / EnemyManager already mounted
+    if (enemyManagerRef.value && waveManager) {
+      enemyManagerRef.value.setOnEnemyKilled((enemyId: string) => {
+        waveManager?.onEnemyKilled(enemyId)
+      })
+      enemyManagerRef.value.setPowerUpManager(powerUpManager)
+      waveManager.startGame()
+    }
 
     // Restore from save
     if (loadFromSave()) {

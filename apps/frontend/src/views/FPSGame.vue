@@ -217,6 +217,8 @@ const onSceneReady = (
     return false
   })
 
+  // Unblock EnemyManager mount so the watch inside waveSystem.init()
+  // can pick up enemyManagerRef and start the game.
   isLoading.value = false
 }
 

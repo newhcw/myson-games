@@ -7,7 +7,7 @@
 # Test info
 
 - Name: kids-game-platform/TC0002-game-navigation.spec.ts >> 游戏导航测试 >> TC0006 - 游戏页面应显示初始生命值
-- Location: tests/e2e/kids-game-platform/TC0002-game-navigation.spec.ts:51:3
+- Location: tests/e2e/kids-game-platform/TC0002-game-navigation.spec.ts:54:3
 
 # Error details
 
@@ -22,7 +22,7 @@ Timeout:  5000ms
 Call log:
   - Expect "toBeVisible" with timeout 5000ms
   - waiting for locator('.health-bar .fill')
-    7 × locator resolved to <div class="fill" data-v-22bfadbf=""></div>
+    4 × locator resolved to <div class="fill" data-v-22bfadbf=""></div>
       - unexpected value "hidden"
 
 ```
@@ -74,7 +74,7 @@ Call log:
   3  | import { GamePage } from '../../../pages/GamePage';
   4  | 
   5  | /**
-  6  |  * TC0004: 点击开始游戏按钮应能启动游戏
+  6  |  * TC0004: 点击开始冒险按钮应能启动游戏
   7  |  * TC0005: 游戏页面应显示正确的 HUD 元素
   8  |  * TC0006: 游戏页面应显示初始生命值
   9  |  */
@@ -87,53 +87,56 @@ Call log:
   16 |     gamePage = new GamePage(page);
   17 |   });
   18 | 
-  19 |   test('TC0004 - 点击开始游戏按钮应能启动游戏', async ({ page }) => {
+  19 |   test('TC0004 - 点击开始冒险按钮应能启动游戏', async ({ page }) => {
   20 |     await homePage.goto();
   21 |     await homePage.expectLoaded();
   22 | 
-  23 |     // 点击开始游戏按钮（验证按钮存在且可点击）
-  24 |     await homePage.startButton.click();
+  23 |     // 验证开始冒险按钮文本
+  24 |     await expect(homePage.startButton).toContainText('⚔️开始冒险');
   25 | 
-  26 |     // 验证按钮被点击（目前只打印日志，没有实际导航）
-  27 |     await expect(homePage.startButton).toBeVisible();
-  28 |   });
-  29 | 
-  30 |   test('TC0005 - 游戏页面应显示正确的 HUD 元素', async () => {
-  31 |     // 直接访问游戏页面
-  32 |     await gamePage.goto();
-  33 |     await gamePage.waitForLoaded();
-  34 |     await gamePage.expectLoaded();
-  35 | 
-  36 |     // 验证HUD元素存在
-  37 |     await expect(gamePage.healthBar).toBeVisible();
-  38 |     await expect(gamePage.score).toBeVisible();
-  39 |     await expect(gamePage.crosshair).toBeVisible();
-  40 |     await expect(gamePage.weaponIndicator).toBeVisible();
-  41 |     await expect(gamePage.weaponInfo).toBeVisible();
-  42 |     await expect(gamePage.controlsHint).toBeVisible();
-  43 | 
-  44 |     // 验证武器槽位显示（6个武器：手枪、冲锋枪、步枪、狙击枪、霰弹枪、火箭筒）
-  45 |     await expect(gamePage.weaponSlots).toHaveCount(6);
+  26 |     // 点击开始冒险按钮
+  27 |     await homePage.startButton.click();
+  28 | 
+  29 |     // 验证按钮被点击（目前只打印日志，没有实际导航）
+  30 |     await expect(homePage.startButton).toBeVisible();
+  31 |   });
+  32 | 
+  33 |   test('TC0005 - 游戏页面应显示正确的 HUD 元素', async () => {
+  34 |     // 直接访问游戏页面
+  35 |     await gamePage.goto();
+  36 |     await gamePage.waitForLoaded();
+  37 |     await gamePage.expectLoaded();
+  38 | 
+  39 |     // 验证HUD元素存在
+  40 |     await expect(gamePage.healthBar).toBeVisible();
+  41 |     await expect(gamePage.score).toBeVisible();
+  42 |     await expect(gamePage.crosshair).toBeVisible();
+  43 |     await expect(gamePage.weaponIndicator).toBeVisible();
+  44 |     await expect(gamePage.weaponInfo).toBeVisible();
+  45 |     await expect(gamePage.controlsHint).toBeVisible();
   46 | 
-  47 |     // 验证控制提示文字
-  48 |     await expect(gamePage.controlsHint).toContainText('WASD 移动');
-  49 |   });
-  50 | 
-  51 |   test('TC0006 - 游戏页面应显示初始生命值', async () => {
-  52 |     await gamePage.goto();
-  53 |     await gamePage.waitForLoaded();
-  54 | 
-  55 |     // 验证生命值图标 (❤️)
-  56 |     await expect(gamePage.healthLabel).toContainText('❤️');
+  47 |     // 验证武器槽位显示（6个武器：手枪、冲锋枪、步枪、狙击枪、霰弹枪、火箭筒）
+  48 |     await expect(gamePage.weaponSlots).toHaveCount(6);
+  49 | 
+  50 |     // 验证控制提示文字
+  51 |     await expect(gamePage.controlsHint).toContainText('WASD 移动');
+  52 |   });
+  53 | 
+  54 |   test('TC0006 - 游戏页面应显示初始生命值', async () => {
+  55 |     await gamePage.goto();
+  56 |     await gamePage.waitForLoaded();
   57 | 
-  58 |     // 验证生命值条可见
-  59 |     const healthFill = gamePage.healthFill;
-> 60 |     await expect(healthFill).toBeVisible();
+  58 |     // 验证生命值图标 (❤️)
+  59 |     await expect(gamePage.healthLabel).toContainText('❤️');
+  60 | 
+  61 |     // 验证生命值条可见
+  62 |     const healthFill = gamePage.healthFill;
+> 63 |     await expect(healthFill).toBeVisible();
      |                              ^ Error: expect(locator).toBeVisible() failed
-  61 | 
-  62 |     // 验证得分和击杀显示
-  63 |     await expect(gamePage.score).toContainText('得分: 0');
-  64 |     await expect(gamePage.kills).toContainText('击杀: 0');
-  65 |   });
-  66 | });
+  64 | 
+  65 |     // 验证得分和击杀显示
+  66 |     await expect(gamePage.score).toContainText('得分: 0');
+  67 |     await expect(gamePage.kills).toContainText('击杀: 0');
+  68 |   });
+  69 | });
 ```
