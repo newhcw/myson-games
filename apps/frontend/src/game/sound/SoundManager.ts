@@ -253,6 +253,54 @@ export class SoundManager {
   }
 
   /**
+   * 跳跃音效 - 轻快的上升音调
+   */
+  playJump() {
+    if (!this.audioContext || !this.masterGain) return
+
+    const now = this.audioContext.currentTime
+
+    const osc = this.audioContext.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(300, now)
+    osc.frequency.exponentialRampToValueAtTime(600, now + 0.15)
+
+    const gain = this.audioContext.createGain()
+    gain.gain.setValueAtTime(0.25, now)
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15)
+
+    osc.connect(gain)
+    gain.connect(this.masterGain)
+
+    osc.start(now)
+    osc.stop(now + 0.15)
+  }
+
+  /**
+   * 落地音效 - 沉闷的撞击声
+   */
+  playLand() {
+    if (!this.audioContext || !this.masterGain) return
+
+    const now = this.audioContext.currentTime
+
+    const osc = this.audioContext.createOscillator()
+    osc.type = 'triangle'
+    osc.frequency.setValueAtTime(150, now)
+    osc.frequency.exponentialRampToValueAtTime(50, now + 0.1)
+
+    const gain = this.audioContext.createGain()
+    gain.gain.setValueAtTime(0.3, now)
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1)
+
+    osc.connect(gain)
+    gain.connect(this.masterGain)
+
+    osc.start(now)
+    osc.stop(now + 0.1)
+  }
+
+  /**
    * 创建噪音源
    */
   private createNoise(duration: number): AudioBufferSourceNode {

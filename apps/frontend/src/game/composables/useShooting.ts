@@ -18,6 +18,7 @@ export interface ShootingDeps {
   currentSpread: Ref<number>
   applyRecoil: (weapon: any) => void
   startCameraShake: (duration?: number, intensity?: number) => void
+  isScopeActive?: Ref<boolean>
 }
 
 export function useShooting(deps: ShootingDeps) {
@@ -32,6 +33,7 @@ export function useShooting(deps: ShootingDeps) {
     currentSpread,
     applyRecoil,
     startCameraShake,
+    isScopeActive,
   } = deps
 
   const weaponStore = useWeaponStore()
@@ -103,9 +105,17 @@ export function useShooting(deps: ShootingDeps) {
     if (!camera.value || !scene.value) return
 
     let spread = currentSpread.value
+
+    // 倍镜激活时散布减少 90%
+    if (isScopeActive?.value) {
+      spread *= 0.1
+    }
+
+    // 屏息时散布减少 80%（与开镜效果叠加）
     if (isHoldingBreath.value && breathStamina.value > 0) {
       spread *= 0.2
     }
+
     const spreadRad = (spread * Math.PI) / 180
     const randomAngle = Math.random() * Math.PI * 2
     const randomRadius = Math.random() * spreadRad

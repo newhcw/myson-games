@@ -56,7 +56,7 @@ const onTouchLookEnd = (e: TouchEvent) => {
     <!-- 右侧虚拟按钮 -->
     <div class="virtual-buttons-right">
       <VirtualButton label="射击" type="shoot" @press="onVirtualButtonPress" @release="onVirtualButtonRelease" />
-      <VirtualButton label="跳跃" type="jump" @press="onVirtualButtonPress" />
+      <VirtualButton label="跳跃" type="jump" @press="onVirtualButtonPress" @release="onVirtualButtonRelease" />
       <VirtualButton label="下蹲" type="crouch" @press="onVirtualButtonPress" />
       <VirtualButton label="换弹" type="reload" @press="onVirtualButtonPress" />
       <VirtualButton label="倍镜" type="scope" @press="onVirtualButtonPress" />

@@ -13,6 +13,8 @@ export interface PlayerInputCallbacks {
   onShootStart: () => void
   onShootStop: () => void
   onJump: () => void
+  onJumpStart: () => void
+  onJumpRelease: () => void
   onToggleCrouch: () => void
   onReload: () => void
   onToggleScope: () => void
@@ -65,7 +67,7 @@ export function usePlayerInput(
         callbacks.onShootStart()
         break
       case 'jump':
-        callbacks.onJump()
+        callbacks.onJumpStart()
         break
       case 'crouch':
         callbacks.onToggleCrouch()
@@ -82,6 +84,8 @@ export function usePlayerInput(
   const onVirtualButtonRelease = (type: string) => {
     if (type === 'shoot') {
       callbacks.onShootStop()
+    } else if (type === 'jump') {
+      callbacks.onJumpRelease()
     }
   }
 
@@ -148,6 +152,7 @@ export function usePlayerInput(
       case 's': keys.s = true; break
       case 'd': keys.d = true; break
       case 'shift': isRunning.value = true; break
+      case ' ': e.preventDefault(); callbacks.onJumpStart(); break
     }
 
     inputManager.handleKeyDown(e.key)
@@ -159,6 +164,8 @@ export function usePlayerInput(
       case 'a': keys.a = false; break
       case 's': keys.s = false; break
       case 'd': keys.d = false; break
+      case 'shift': isRunning.value = false; break
+      case ' ': e.preventDefault(); callbacks.onJumpRelease(); break
     }
     inputManager.handleKeyUp(e.key)
   }

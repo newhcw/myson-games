@@ -17,11 +17,21 @@
 
 #### Scenario: 视角摇晃模拟
 - **WHEN** updateSway 每帧调用
-- **THEN** 生成 figure-8 图案的摇晃偏移（swayOffset），瞄准时幅度降至 30%
+- **THEN** 生成 figure-8 图案的摇晃偏移（swayOffset），瞄准时幅度降至 30%，倍镜激活时幅度进一步降至 10%
+
+#### Scenario: 倍镜激活时视角摇晃大幅减少
+- **GIVEN** 倍镜处于激活状态（scope.isActive = true）
+- **WHEN** updateSway 每帧调用
+- **THEN** swayOffset 幅度为基础值的 10%
+
+#### Scenario: 屏息且开镜时摇晃最小
+- **GIVEN** 玩家处于屏息状态且倍镜激活
+- **WHEN** updateSway 每帧调用
+- **THEN** swayOffset 幅度为基础值的 5%（两者叠加）
 
 #### Scenario: 呼吸模拟
 - **WHEN** updateSway 每帧调用
-- **THEN** 生成垂直为主的呼吸摇晃（breathingSway），瞄准时幅度降至 30%
+- **THEN** 生成垂直为主的呼吸摇晃（breathingSway），瞄准时幅度降至 30%，倍镜激活时幅度进一步降至 10%
 
 #### Scenario: 后坐力恢复
 - **WHEN** updateRecoilRecovery 每帧调用
@@ -30,6 +40,28 @@
 #### Scenario: RPG 镜头震动
 - **WHEN** RPG 发射触发 startCameraShake
 - **THEN** 在指定持续时间内对相机施加随机偏移，结束后恢复
+
+### Requirement: 跳跃相机反馈
+跳跃时 SHALL 有相机位移和震动反馈。
+
+#### Scenario: 起跳相机下沉
+- **WHEN** 玩家按下跳跃键
+- **THEN** 相机轻微下沉（约 0.05m）后快速恢复，模拟腿部发力
+
+#### Scenario: 落地相机震动
+- **WHEN** 玩家从跳跃中落地且下落速度超过 5
+- **THEN** 触发相机轻微震动效果并播放落地音效
+
+### Requirement: 跳跃音效
+跳跃 SHALL 有对应的音效反馈。
+
+#### Scenario: 起跳播放音效
+- **WHEN** 玩家执行跳跃动作
+- **THEN** 播放跳跃上升音效
+
+#### Scenario: 落地播放音效
+- **WHEN** 玩家跳跃落地且速度较大
+- **THEN** 播放沉闷撞击音效
 
 ### Requirement: 相机效果 update 调度
 useCameraEffects SHALL 暴露 `update(delta)` 方法供游戏循环统一调用，内部调度 sway、recoilRecovery 和 cameraShake 的更新。

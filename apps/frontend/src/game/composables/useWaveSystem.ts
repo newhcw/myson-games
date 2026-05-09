@@ -39,7 +39,7 @@ export function useWaveSystem() {
     const selectedPoints: THREE.Vector3[] = []
 
     const existingEnemies = enemyManagerRef.value.getActiveEnemies() || []
-    const existingPositions = existingEnemies.map((e: any) => ({ x: e.mesh.position.x, z: e.mesh.position.z }))
+    const existingPositions = existingEnemies.map((e: any) => ({ x: e.position.x, z: e.position.z }))
 
     for (let i = 0; i < pointCount; i++) {
       const pos = findSafeSpawnPosition(existingPositions, MIN_SPAWN_DISTANCE, 50)

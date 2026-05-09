@@ -12,11 +12,13 @@ export interface ObstacleData {
 
 export class CollisionDetector {
   private colliders: THREE.Box3[] = []
+  private colliderTopHeights: number[] = []
   private obstacleMap: Map<string, ObstacleData> = new Map()
 
   addCollider(mesh: THREE.Object3D, health?: number, hitPosition?: THREE.Vector3) {
     const box = new THREE.Box3().setFromObject(mesh)
     this.colliders.push(box)
+    this.colliderTopHeights.push(box.max.y)
 
     // 如果指定了血量，注册为可破坏障碍物
     if (health !== undefined) {
@@ -38,6 +40,7 @@ export class CollisionDetector {
 
   removeAllColliders() {
     this.colliders = []
+    this.colliderTopHeights = []
     this.obstacleMap.clear()
   }
 
@@ -47,14 +50,23 @@ export class CollisionDetector {
     // 注意：colliders 数组中的 Box3 不会自动移除，但被破坏的障碍物 mesh 会被移除
   }
 
-  checkCollision(position: THREE.Vector3, radius: number = 0.5): boolean {
+  checkCollision(position: THREE.Vector3, radius: number = 0.5): boolean
+  checkCollision(position: THREE.Vector3, radius: number, isInAir: boolean, playerBottomY: number): boolean
+  checkCollision(position: THREE.Vector3, radius: number = 0.5, isInAir?: boolean, playerBottomY?: number): boolean {
     const playerBox = new THREE.Box3(
       new THREE.Vector3(position.x - radius, position.y - 1, position.z - radius),
       new THREE.Vector3(position.x + radius, position.y + 0.5, position.z + radius)
     )
 
-    for (const collider of this.colliders) {
+    for (let i = 0; i < this.colliders.length; i++) {
+      const collider = this.colliders[i]
       if (playerBox.intersectsBox(collider)) {
+        if (isInAir && playerBottomY !== undefined) {
+          const obstacleTop = this.colliderTopHeights[i]
+          if (playerBottomY >= obstacleTop) {
+            continue
+          }
+        }
         return true
       }
     }

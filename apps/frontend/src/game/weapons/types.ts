@@ -89,8 +89,8 @@ export const DEFAULT_WEAPONS: WeaponData[] = [
     fireRate: 5,
     magazineSize: 30,
     reloadTime: 2500,
-    scope: false,
-    scopeMultiplier: 1,
+    scope: true,
+    scopeMultiplier: 2,
     description: '全能型，适合中距离',
     isAuto: true,
     // 后坐力：中等

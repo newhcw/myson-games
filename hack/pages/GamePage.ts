@@ -26,6 +26,10 @@ export class GamePage {
   // 加载界面
   readonly loading: Locator
 
+  // 倍镜相关元素
+  readonly vignetteOverlay: Locator
+  readonly scopeCrosshair: Locator
+
   constructor(page: Page) {
     this.page = page
 
@@ -51,6 +55,10 @@ export class GamePage {
 
     // 加载界面
     this.loading = page.locator('.loading')
+
+    // 倍镜相关元素
+    this.vignetteOverlay = page.locator('.vignette-overlay')
+    this.scopeCrosshair = page.locator('.scope-crosshair')
   }
 
   /**

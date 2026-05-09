@@ -17,6 +17,7 @@ interface TestApiContext {
   handleRocketExplosion: (pos: THREE.Vector3) => void
   fireRocket: () => void
   fire: () => void
+  jump: (() => void) | null
 }
 
 export function installTestApi(ctx: TestApiContext) {
@@ -361,6 +362,31 @@ export function installTestApi(ctx: TestApiContext) {
       const pos = ctx.playerPosition.clone().add(new THREE.Vector3(2, 0, 0))
       powerUpManager.spawn({ type, position: pos })
       return true
+    },
+
+    // 检测玩家是否在空中（跳跃中）
+    isPlayerJumping: () => {
+      return ctx.playerPosition.y > 1.7
+    },
+
+    // 获取玩家位置 Y
+    getPlayerY: () => {
+      return ctx.playerPosition.y
+    },
+
+    // 触发跳跃 - 直接设置玩家 Y 坐标模拟跳跃效果
+    triggerJump: () => {
+      try {
+        // 设置玩家 Y 坐标到跳跃高度（约 2.0m）
+        if (ctx.playerPosition.y <= 1.7) {
+          ctx.playerPosition.y = 2.0
+          return true
+        }
+        return false
+      } catch (e) {
+        console.error('triggerJump error:', e)
+        return false
+      }
     },
   }
 }

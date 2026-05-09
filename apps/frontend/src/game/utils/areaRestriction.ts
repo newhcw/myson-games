@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
 export const SAFE_AREA_CENTER = { x: 0, z: 0 }
-export const SAFE_AREA_RADIUS = 25
+export const SAFE_AREA_RADIUS = 50
 export const MIN_SPAWN_DISTANCE = 8
 
 export function isInSafeArea(x: number, z: number): boolean {

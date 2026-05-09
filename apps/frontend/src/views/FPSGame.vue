@@ -5,11 +5,13 @@ import * as THREE from 'three'
 import SceneView from '@/components/game/SceneView.vue'
 import EnemyManager from '@/components/game/EnemyManager.vue'
 import { createObstacles } from '@/game/utils/createObstacles'
+import { EnvironmentManager } from '@/game/environment/EnvironmentManager'
 import { GAME_CONTEXT_KEY, type GameContext, type ViewAngles } from '@/game/composables/useGameContext'
 import { useGameSave } from '@/game/composables/useGameSave'
 import { usePlayerMovement } from '@/game/composables/usePlayerMovement'
 import { usePlayerInput } from '@/game/composables/usePlayerInput'
 import { useCameraEffects } from '@/game/composables/useCameraEffects'
+import { useScopeMagnification } from '@/game/composables/useScopeMagnification'
 import { useShooting } from '@/game/composables/useShooting'
 import { useWaveSystem } from '@/game/composables/useWaveSystem'
 import { useWeaponStore } from '@/stores/weapon'
@@ -23,6 +25,8 @@ import { installTestApi } from '@/game/test/testApi'
 import GameHUD from '@/components/game/GameHUD.vue'
 import PauseMenu from '@/components/game/PauseMenu.vue'
 import TouchControls from '@/components/game/TouchControls.vue'
+import VignetteOverlay from '@/components/game/VignetteOverlay.vue'
+import ScopeCrosshair from '@/components/game/ScopeCrosshair.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -56,6 +60,9 @@ const viewAngles: ViewAngles = { yaw: 0, pitch: 0 }
 // 敌人管理器引用（在 composable 使用前声明）
 const enemyManagerRef = ref<any>(null)
 
+// 环境装饰管理器
+const environmentManager = new EnvironmentManager()
+
 // Composable: Wave System (declared early because waveState is needed by usePlayerInput)
 const waveSystem = useWaveSystem()
 const {
@@ -85,7 +92,7 @@ const playerInput = usePlayerInput(
 )
 
 // Composable: Camera Effects
-const cameraEffects = useCameraEffects(camera, viewAngles)
+const cameraEffects = useCameraEffects(camera, viewAngles, () => scopeMagnification.isScopeActive.value)
 const {
   isHoldingBreath,
   breathStamina,
@@ -94,6 +101,9 @@ const {
   applyRecoil,
   startCameraShake,
 } = cameraEffects
+
+// Composable: Scope Magnification
+const scopeMagnification = useScopeMagnification(camera)
 
 // Composable: Shooting
 const shooting = useShooting({
@@ -107,6 +117,7 @@ const shooting = useShooting({
   currentSpread,
   applyRecoil,
   startCameraShake,
+  isScopeActive: scopeMagnification.isScopeActive,
 })
 
 // Computed
@@ -169,6 +180,8 @@ Object.assign(inputCallbacks, {
   onShootStart: () => shooting.startFiring(),
   onShootStop: () => shooting.stopFiring(),
   onJump: () => playerMovement.jump(),
+  onJumpStart: () => playerMovement.startJumpCharge(),
+  onJumpRelease: () => playerMovement.cancelJumpCharge(),
   onToggleCrouch: () => playerMovement.toggleCrouch(),
   onReload: () => weaponStore.reload(),
   onToggleScope: () => weaponStore.toggleScope(),
@@ -202,6 +215,9 @@ const onSceneReady = (
 
   // Init rocket manager via shooting composable
   shooting.initRocketManager(sceneObj)
+
+  // Init environment decorations
+  environmentManager.init(sceneObj)
 
   // Add obstacles
   createObstacles(scene.value!)
@@ -261,17 +277,11 @@ const gameLoop = () => {
     shooting.update(delta)
     cameraEffects.update(delta)
     waveSystem.update(delta)
+    environmentManager.update(delta)
 
     // Update enemy manager
     if (enemyManagerRef.value) {
       enemyManagerRef.value?.update(delta)
-    }
-
-    // Update scope FOV
-    if (camera.value && weaponStore.currentScope.isActive) {
-      const targetFov = weaponStore.currentScope.originalFov / weaponStore.currentScope.magnification
-      camera.value.fov = THREE.MathUtils.lerp(camera.value.fov, targetFov, 0.1)
-      camera.value.updateProjectionMatrix()
     }
   }
 
@@ -308,6 +318,7 @@ const onRestart = () => {
   waveSystem.reset()
   playerMovement.reset()
   cameraEffects.reset()
+  scopeMagnification.reset()
   lastTime = performance.now()
 }
 
@@ -358,6 +369,14 @@ watch(() => weaponStore.currentScope.isActive, (newVal) => {
   }
 })
 
+// 4.2 玩家死亡时倍镜自动关闭
+watch(() => gameStore.isDead, (isDead) => {
+  if (isDead) {
+    scopeMagnification.deactivateScope()
+    weaponStore.currentScope.isActive = false
+  }
+})
+
 onMounted(() => {
   // Mount input events
   playerInput.mount()
@@ -378,6 +397,7 @@ onMounted(() => {
       handleRocketExplosion: (pos: THREE.Vector3) => shooting.handleRocketExplosion(pos),
       fireRocket: () => shooting.fireRocket(),
       fire: () => shooting.fire(),
+      jump: () => playerMovement.jump(),
     })
   }
 
@@ -400,6 +420,7 @@ onUnmounted(() => {
 
   shooting.dispose()
   waveSystem.dispose()
+  environmentManager.dispose()
 })
 
 
@@ -421,6 +442,18 @@ onUnmounted(() => {
     <SceneView
       v-show="!isLoading"
       @scene-ready="onSceneReady"
+    />
+
+    <!-- 暗角效果 -->
+    <VignetteOverlay
+      :visible="weaponStore.currentScope.isActive"
+      :intensity="0.7"
+    />
+
+    <!-- 瞄准镜准星 -->
+    <ScopeCrosshair
+      :active="weaponStore.currentScope.isActive"
+      :size="80"
     />
 
     <!-- 敌人管理器 -->

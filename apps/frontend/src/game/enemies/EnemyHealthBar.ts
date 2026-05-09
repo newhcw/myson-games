@@ -223,8 +223,8 @@ export class EnemyHealthBar {
       const screenPosition = this.toScreenPosition(enemyTop)
       healthBar.screenY = screenPosition.y
 
-      // 检查是否在屏幕前方
-      const isInFront = screenPosition.z > 0
+      // 检查是否在屏幕前方（在裁剪平面内）
+      const isInFront = screenPosition.z <= 1 && screenPosition.z >= -1
       const isInScreen =
         screenPosition.x >= 0 &&
         screenPosition.x <= window.innerWidth &&

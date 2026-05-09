@@ -1,4 +1,4 @@
-import { ref, type ShallowRef } from 'vue'
+import { ref, watch, type ShallowRef } from 'vue'
 import * as THREE from 'three'
 import type { ViewAngles } from './useGameContext'
 import { useWeaponStore } from '@/stores/weapon'
@@ -6,6 +6,7 @@ import { useWeaponStore } from '@/stores/weapon'
 export function useCameraEffects(
   camera: ShallowRef<THREE.PerspectiveCamera | null>,
   viewAngles: ViewAngles,
+  isScopeActive?: () => boolean
 ) {
   const weaponStore = useWeaponStore()
 
@@ -50,17 +51,34 @@ export function useCameraEffects(
     if (!camera.value) return
 
     const isAiming = weaponStore.currentScope.isActive || isHoldingBreath.value
-    const multiplier = isAiming ? aimingSwayMultiplier : 1.0
+    const isScoped = isScopeActive?.() || weaponStore.currentScope.isActive
+
+    let swayMultiplier = 1.0
+    let breathingMultiplier = 1.0
+
+    if (isScoped && isHoldingBreath.value) {
+      // 开镜 + 屏息时摇晃最小（5%）
+      swayMultiplier = 0.05
+      breathingMultiplier = 0.05
+    } else if (isScoped) {
+      // 仅开镜时摇晃减少至 30%
+      swayMultiplier = 0.3
+      breathingMultiplier = 0.3
+    } else if (isAiming) {
+      // 仅屏息时摇晃减少至 30%
+      swayMultiplier = 0.3
+      breathingMultiplier = 0.3
+    }
 
     swayTime.value += delta * swaySpeed
     breathingTime.value += delta * breathingSpeed
 
-    const swayX = Math.sin(swayTime.value) * swayAmount * multiplier
-    const swayY = Math.sin(swayTime.value * 0.7) * swayAmount * 0.5 * multiplier
+    const swayX = Math.sin(swayTime.value) * swayAmount * swayMultiplier
+    const swayY = Math.sin(swayTime.value * 0.7) * swayAmount * 0.5 * swayMultiplier
     swayOffset.value = { x: swayX, y: swayY }
 
-    const breathY = Math.sin(breathingTime.value) * breathingAmount * multiplier
-    const breathX = Math.sin(breathingTime.value * 0.5) * breathingAmount * 0.3 * multiplier
+    const breathY = Math.sin(breathingTime.value) * breathingAmount * breathingMultiplier
+    const breathX = Math.sin(breathingTime.value * 0.5) * breathingAmount * 0.3 * breathingMultiplier
     breathingSway.value = { x: breathX, y: breathY }
 
     viewAngles.yaw += swayOffset.value.x + breathingSway.value.x

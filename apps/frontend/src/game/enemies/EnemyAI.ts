@@ -6,6 +6,7 @@ import { EnemyHealthBar } from './EnemyHealthBar'
 import { enemyShooter } from './EnemyShooter'
 import { ProjectileManager } from './ProjectileManager'
 import { collisionDetector } from '@/game/utils/Collision'
+import { clampToSafeArea, SAFE_AREA_RADIUS } from '@/game/utils/areaRestriction'
 
 export interface EnemyAIOptions {
   playerPosition: THREE.Vector3
@@ -65,11 +66,6 @@ export class EnemyAI {
     }
 
     this.enemies.set(enemy.id, enemy)
-
-    // 立即初始化血条（避免懒加载导致的显示延迟）
-    if (this.healthBar) {
-      this.healthBar.update(enemy)
-    }
 
     return enemy
   }
@@ -316,7 +312,11 @@ export class EnemyAI {
           } else {
             // 移动向下一个路点
             const direction = new THREE.Vector3().subVectors(target, enemy.position).normalize()
-            enemy.position.add(direction.multiplyScalar(speed * delta))
+            const newPos = enemy.position.clone().add(direction.multiplyScalar(speed * delta))
+            // 限制在安全区内
+            const clamped = clampToSafeArea(newPos.x, newPos.z)
+            enemy.position.x = clamped.x
+            enemy.position.z = clamped.z
           }
         }
         break
@@ -361,6 +361,11 @@ export class EnemyAI {
         }
         break
     }
+
+    // 限制敌人不能跑出安全区
+    const clamped = clampToSafeArea(enemy.position.x, enemy.position.z)
+    enemy.position.x = clamped.x
+    enemy.position.z = clamped.z
   }
 
   // ========== 自爆兵行为 ==========
@@ -408,6 +413,9 @@ export class EnemyAI {
     enemy.health = 0
     enemy.isDead = true
     enemy.state = 'dead'
+
+    // 移除血条
+    this.healthBar?.remove(enemy.id)
 
     // 播放死亡动画
     if (enemy.mesh) {
@@ -701,6 +709,9 @@ export class EnemyAI {
       enemy.isDead = true
       enemy.state = 'dead'
       killed = true
+
+      // 移除血条
+      this.healthBar?.remove(enemy.id)
 
       // 播放死亡动画
       if (enemy.mesh) {
