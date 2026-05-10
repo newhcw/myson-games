@@ -325,6 +325,13 @@ export function usePlayerInput(
     })
   }
 
+  // 阻止右键菜单（鼠标未锁定时禁用右键）
+  const handleContextMenu = (e: MouseEvent) => {
+    if (document.pointerLockElement !== containerRef.value) {
+      e.preventDefault()
+    }
+  }
+
   // ========== Lifecycle ==========
   const handlePointerLockChange = () => {
     if (document.pointerLockElement !== containerRef.value) {
@@ -341,6 +348,7 @@ export function usePlayerInput(
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mousedown', handleMouseDown)
     document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('contextmenu', handleContextMenu)
     document.addEventListener('pointerlockchange', handlePointerLockChange)
   }
 
@@ -350,6 +358,7 @@ export function usePlayerInput(
     document.removeEventListener('mousemove', handleMouseMove)
     document.removeEventListener('mousedown', handleMouseDown)
     document.removeEventListener('mouseup', handleMouseUp)
+    document.removeEventListener('contextmenu', handleContextMenu)
     document.removeEventListener('pointerlockchange', handlePointerLockChange)
   }
 
