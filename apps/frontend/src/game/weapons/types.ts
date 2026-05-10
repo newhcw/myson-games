@@ -67,7 +67,7 @@ export const DEFAULT_WEAPONS: WeaponData[] = [
     description: '射速快，近战利器',
     isAuto: true,
     // 后坐力：中等，水平晃动大
-    recoilAmount: 0.5,
+    recoilAmount: 0.6,
     recoilRecovery: 6,
     recoilPattern: [
       { x: 0, y: -0.4 },
@@ -94,7 +94,7 @@ export const DEFAULT_WEAPONS: WeaponData[] = [
     description: '全能型，适合中距离',
     isAuto: true,
     // 后坐力：中等
-    recoilAmount: 0.6,
+    recoilAmount: 0.8,
     recoilRecovery: 5,
     recoilPattern: [
       { x: 0, y: -0.6 },
@@ -120,7 +120,7 @@ export const DEFAULT_WEAPONS: WeaponData[] = [
     description: '高伤害，超远距离',
     isAuto: false,
     // 后坐力：大
-    recoilAmount: 1.0,
+    recoilAmount: 1.5,
     recoilRecovery: 3,
     recoilPattern: [
       { x: 0, y: -1.0 },
@@ -143,7 +143,7 @@ export const DEFAULT_WEAPONS: WeaponData[] = [
     description: '范围伤害，近战之王',
     isAuto: false,
     // 后坐力：很大
-    recoilAmount: 0.9,
+    recoilAmount: 1.8,
     recoilRecovery: 2,
     recoilPattern: [
       { x: 0, y: -0.8 },
@@ -166,7 +166,7 @@ export const DEFAULT_WEAPONS: WeaponData[] = [
     description: '发射火箭，范围爆炸',
     isAuto: false,
     // 后坐力：极大
-    recoilAmount: 1.2,
+    recoilAmount: 2.0,
     recoilRecovery: 1.5,
     recoilPattern: [
       { x: 0, y: -1.2 },

@@ -92,7 +92,12 @@ const playerInput = usePlayerInput(
 )
 
 // Composable: Camera Effects
-const cameraEffects = useCameraEffects(camera, viewAngles, () => scopeMagnification.isScopeActive.value)
+const cameraEffects = useCameraEffects(
+  camera,
+  viewAngles,
+  () => scopeMagnification.isScopeActive.value,
+  () => playerMovement.keys.w || playerMovement.keys.a || playerMovement.keys.s || playerMovement.keys.d
+)
 const {
   isHoldingBreath,
   breathStamina,

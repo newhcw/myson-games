@@ -6,7 +6,8 @@ import { useWeaponStore } from '@/stores/weapon'
 export function useCameraEffects(
   camera: ShallowRef<THREE.PerspectiveCamera | null>,
   viewAngles: ViewAngles,
-  isScopeActive?: () => boolean
+  isScopeActive?: () => boolean,
+  isPlayerMoving?: () => boolean
 ) {
   const weaponStore = useWeaponStore()
 
@@ -52,6 +53,7 @@ export function useCameraEffects(
 
     const isAiming = weaponStore.currentScope.isActive || isHoldingBreath.value
     const isScoped = isScopeActive?.() || weaponStore.currentScope.isActive
+    const isMoving = isPlayerMoving?.() || false
 
     let swayMultiplier = 1.0
     let breathingMultiplier = 1.0
@@ -68,6 +70,10 @@ export function useCameraEffects(
       // 仅屏息时摇晃减少至 30%
       swayMultiplier = 0.3
       breathingMultiplier = 0.3
+    } else if (!isMoving) {
+      // 玩家静止时晃动减少至 20%
+      swayMultiplier = 0.2
+      breathingMultiplier = 0.2
     }
 
     swayTime.value += delta * swaySpeed
@@ -184,8 +190,8 @@ export function useCameraEffects(
 
     recoilIndex.value++
 
-    viewAngles.yaw += recoilOffset.value.x * 0.01
-    viewAngles.pitch += recoilOffset.value.y * 0.01
+    viewAngles.yaw += recoilOffset.value.x * 0.1
+    viewAngles.pitch += recoilOffset.value.y * 0.1
     viewAngles.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, viewAngles.pitch))
 
     camera.value.rotation.order = 'YXZ'
