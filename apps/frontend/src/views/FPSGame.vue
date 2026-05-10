@@ -277,7 +277,7 @@ const gameLoop = () => {
     shooting.update(delta)
     cameraEffects.update(delta)
     waveSystem.update(delta)
-    environmentManager.update(delta)
+    environmentManager.update(delta, playerPosition)
 
     // Update enemy manager
     if (enemyManagerRef.value) {
@@ -369,11 +369,24 @@ watch(() => weaponStore.currentScope.isActive, (newVal) => {
   }
 })
 
-// 4.2 玩家死亡时倍镜自动关闭
+// 4.2 玩家死亡时倍镜自动关闭，释放指针锁定
 watch(() => gameStore.isDead, (isDead) => {
   if (isDead) {
     scopeMagnification.deactivateScope()
     weaponStore.currentScope.isActive = false
+    // 释放指针锁定，让玩家可以点击死亡界面的按钮
+    if (document.pointerLockElement) {
+      document.exitPointerLock()
+    }
+    // 死亡时恢复光标，让玩家能看到鼠标
+    if (containerRef.value) {
+      containerRef.value.style.cursor = 'pointer'
+    }
+  } else {
+    // 复活时恢复 cursor none
+    if (containerRef.value) {
+      containerRef.value.style.cursor = ''
+    }
   }
 })
 

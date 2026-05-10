@@ -6,6 +6,7 @@ import { DEFAULT_KEY_BINDINGS, type KeyBindingConfig } from '@/game/input/KeyBin
 import { useWeaponStore } from '@/stores/weapon'
 import { useGameStore } from '@/stores/game'
 import { soundManager } from '@/game/sound/SoundManager'
+import { dropHint } from '@/game/ui/DropHint'
 import type { ViewAngles } from './useGameContext'
 
 export interface PlayerInputCallbacks {
@@ -122,6 +123,8 @@ export function usePlayerInput(
 
   // ========== Keyboard / Mouse handlers ==========
   const handleKeyDown = (e: KeyboardEvent) => {
+    if (gameStore.isDead) return
+
     if (e.key === 'F9') {
       e.preventDefault()
       callbacks.onManualSave()
@@ -187,7 +190,7 @@ export function usePlayerInput(
 
   const handleClick = async () => {
     if (!containerRef.value) return
-    if (document.pointerLockElement !== containerRef.value) {
+    if (document.pointerLockElement !== containerRef.value && !gameStore.isDead) {
       try {
         await containerRef.value.requestPointerLock()
         soundManager.resume()
@@ -199,6 +202,32 @@ export function usePlayerInput(
 
   const handleMouseDown = (e: MouseEvent) => {
     if (document.pointerLockElement !== containerRef.value) return
+
+    // 玩家死亡时禁止开枪
+    if (gameStore.isDead) return
+
+    // 鼠标右键 = button 2，用于切换倍镜
+    if (e.button === 2) {
+      e.preventDefault()
+      const savedBindings = localStorage.getItem('game-key-bindings')
+      let scopeKey = 'mouseright'
+      if (savedBindings) {
+        try {
+          const bindings = JSON.parse(savedBindings)
+          scopeKey = bindings['scope'] || 'mouseright'
+        } catch { /* ignore */ }
+      }
+
+      if (scopeKey === 'mouseright') {
+        const weapon = weaponStore.currentWeapon
+        if (!weapon?.scope) {
+          dropHint.showScopeNotSupported()
+          return
+        }
+        callbacks.onToggleScope()
+      }
+      return
+    }
 
     const savedBindings = localStorage.getItem('game-key-bindings')
     let shootKey = 'mouseleft'
@@ -218,6 +247,11 @@ export function usePlayerInput(
   }
 
   const handleMouseUp = (e: MouseEvent) => {
+    // 鼠标右键松开
+    if (e.button === 2) {
+      return
+    }
+
     const savedBindings = localStorage.getItem('game-key-bindings')
     let shootKey = 'mouseleft'
     if (savedBindings) {
@@ -232,24 +266,6 @@ export function usePlayerInput(
 
     if (e.button === shootButton) {
       callbacks.onShootStop()
-    }
-  }
-
-  const handleContextMenu = (e: MouseEvent) => {
-    e.preventDefault()
-    if (document.pointerLockElement !== containerRef.value) return
-
-    const savedBindings = localStorage.getItem('game-key-bindings')
-    let scopeKey = 'mouseright'
-    if (savedBindings) {
-      try {
-        const bindings = JSON.parse(savedBindings)
-        scopeKey = bindings['scope'] || 'mouseright'
-      } catch { /* ignore */ }
-    }
-
-    if (scopeKey === 'mouseright') {
-      callbacks.onToggleScope()
     }
   }
 
@@ -326,7 +342,6 @@ export function usePlayerInput(
     document.addEventListener('mousedown', handleMouseDown)
     document.addEventListener('mouseup', handleMouseUp)
     document.addEventListener('pointerlockchange', handlePointerLockChange)
-    containerRef.value?.addEventListener('contextmenu', handleContextMenu)
   }
 
   const unmount = () => {
@@ -336,7 +351,6 @@ export function usePlayerInput(
     document.removeEventListener('mousedown', handleMouseDown)
     document.removeEventListener('mouseup', handleMouseUp)
     document.removeEventListener('pointerlockchange', handlePointerLockChange)
-    containerRef.value?.removeEventListener('contextmenu', handleContextMenu)
   }
 
   const processInputBuffer = () => {

@@ -135,6 +135,13 @@ export class DropHint {
   }
 
   /**
+   * 显示倍镜切换失败提示（当前武器不支持倍镜）
+   */
+  showScopeNotSupported() {
+    this.show('该武器不支持倍镜，按3切换步枪，按4切换狙击枪', '#FF8844', 2000, '24px')
+  }
+
+  /**
    * 隐藏提示
    */
   hide() {
