@@ -173,6 +173,7 @@ export class EnemyHealthBar {
       healthText,
       typeLabel,
       visible: false,
+      screenY: 0,
       bossPhaseText,
       lastPhaseFlash: 0,
       cooldownBar,

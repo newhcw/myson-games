@@ -18,9 +18,9 @@ const props = defineProps<{
   currentWave: number
   waveProgressText: string
   isBossWave: boolean
-  waveState: 'spawning' | 'active' | 'intermission'
+  waveState: 'waving' | 'intermission' | 'victory'
   intermissionCountdown: number
-  activeBuffs: Array<{ type: string; duration: number }>
+  activeBuffs: Array<{ type: string; endTime: number; active: boolean }>
   currentWeaponIndex: number
   currentWeaponName: string
   ammoDisplay: string
@@ -98,7 +98,7 @@ const breathBarStyle = computed(() => ({
         :data-buff-type="buff.type"
       >
         <span class="buff-emoji">{{ buff.type === 'doubleDamage' ? '⚡' : '✨' }}</span>
-        <span class="buff-timer">{{ buffsStore.getBuffRemaining(buff.type) }}s</span>
+        <span class="buff-timer">{{ buffsStore.getBuffRemaining(buff.type as 'doubleDamage') }}s</span>
       </div>
     </div>
 

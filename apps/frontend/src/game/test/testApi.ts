@@ -251,7 +251,7 @@ export function installTestApi(ctx: TestApiContext) {
       const defaultForward = new THREE.Vector3(0, 0, -1)
       const quat = new THREE.Quaternion().setFromUnitVectors(defaultForward, targetDir)
       ctx.camera.value.quaternion.copy(quat)
-      ctx.yaw.set = Math.atan2(targetDir.x, -targetDir.z)
+      ctx.yaw.set(Math.atan2(targetDir.x, -targetDir.z))
       return true
     },
 
@@ -304,7 +304,7 @@ export function installTestApi(ctx: TestApiContext) {
 
     // 获取 Buff 状态
     hasBuff: (type: string) => {
-      return buffsStore.hasBuff(type)
+      return buffsStore.hasBuff(type as 'doubleDamage')
     },
 
     // 获取武器信息

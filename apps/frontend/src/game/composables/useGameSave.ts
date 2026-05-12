@@ -28,7 +28,7 @@ export function useGameSave(
         score: gameStore.score,
         kills: gameStore.kills,
         gameTime: gameStore.gameTime,
-        state: gameStore.gameState,
+        state: (gameStore.gameState === 'ended' ? 'playing' : gameStore.gameState) as 'idle' | 'playing' | 'paused',
       },
       weapon: {
         currentIndex: weaponStore.currentWeaponIndex,

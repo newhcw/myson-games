@@ -50,12 +50,13 @@ export class CollisionDetector {
     // 注意：colliders 数组中的 Box3 不会自动移除，但被破坏的障碍物 mesh 会被移除
   }
 
-  checkCollision(position: THREE.Vector3, radius: number = 0.5): boolean
+  checkCollision(position: THREE.Vector3, radius: number): boolean
   checkCollision(position: THREE.Vector3, radius: number, isInAir: boolean, playerBottomY: number): boolean
-  checkCollision(position: THREE.Vector3, radius: number = 0.5, isInAir?: boolean, playerBottomY?: number): boolean {
+  checkCollision(position: THREE.Vector3, radius: number, isInAir?: boolean, playerBottomY?: number): boolean {
+    const actualRadius = radius ?? 0.5
     const playerBox = new THREE.Box3(
-      new THREE.Vector3(position.x - radius, position.y - 1, position.z - radius),
-      new THREE.Vector3(position.x + radius, position.y + 0.5, position.z + radius)
+      new THREE.Vector3(position.x - actualRadius, position.y - 1, position.z - actualRadius),
+      new THREE.Vector3(position.x + actualRadius, position.y + 0.5, position.z + actualRadius)
     )
 
     for (let i = 0; i < this.colliders.length; i++) {

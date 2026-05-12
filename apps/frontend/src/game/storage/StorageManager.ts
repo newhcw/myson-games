@@ -183,7 +183,7 @@ export class StorageManager {
    * 读取游戏存档
    */
   loadGame(): GameSaveData | null {
-    return localStorage$.get<GameSaveData>(STORAGE_KEYS.SAVE, null)
+    return localStorage$.get<GameSaveData | null>(STORAGE_KEYS.SAVE, null) as GameSaveData | null
   }
 
   /**

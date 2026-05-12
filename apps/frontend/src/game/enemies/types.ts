@@ -156,6 +156,13 @@ export const ENEMY_CONFIGS: Record<string, EnemyConfig> = {
 // 敌人AI状态
 export type EnemyState = 'patrol' | 'wait' | 'chase' | 'search' | 'attack' | 'dead'
 
+// 射击结果
+export interface ShootResult {
+  hit: boolean
+  damage: number
+  enemy: Enemy
+}
+
 // 敌人实例
 export interface Enemy {
   id: string
@@ -224,6 +231,10 @@ export class EnemyManager {
       chargeLine: null,
       lastSpecialAttackTime: 0,
       warningRing: null,
+      phase: 1,
+      isExploding: false,
+      explosionStartTime: 0,
+      lastHealTime: 0,
     }
 
     // 生成巡逻路径点

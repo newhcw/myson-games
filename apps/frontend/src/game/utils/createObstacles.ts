@@ -221,7 +221,9 @@ export function createObstacleMesh(preset: ObstaclePreset): THREE.Group {
       const mesh = new THREE.Mesh(geometry, material)
       mesh.position.set(preset.pos[0], preset.pos[1], preset.pos[2])
       mesh.castShadow = preset.castShadow
-      return mesh
+      const group = new THREE.Group()
+      group.add(mesh)
+      return group
   }
 }
 
